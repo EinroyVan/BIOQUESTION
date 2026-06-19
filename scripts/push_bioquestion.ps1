@@ -67,10 +67,15 @@ function Invoke-Gh {
     $prev = $ErrorActionPreference
     $ErrorActionPreference = "SilentlyContinue"
     try {
-        & $GhExe @GhArgs
+        $output = & $GhExe @GhArgs 2>&1 | Out-String
         if ($LASTEXITCODE -ne 0) {
-            throw "gh $($GhArgs -join ' ') failed (exit $LASTEXITCODE)"
+            $cmd = "gh $($GhArgs -join ' ')"
+            if ($output.Trim()) {
+                throw "$cmd failed (exit $LASTEXITCODE): $($output.Trim())"
+            }
+            throw "$cmd failed (exit $LASTEXITCODE)"
         }
+        return $output
     } finally {
         $ErrorActionPreference = $prev
     }
@@ -110,19 +115,22 @@ if ($status) {
 }
 
 $remote = "https://github.com/EinroyVan/BIOQUESTION.git"
+$repoName = "EinroyVan/BIOQUESTION"
+$repoDesc = "Biomedical literature extract, quiz, and grade (Gemini + Streamlit)"
+
+if (-not (Test-GhRepo -GhExe $Gh -Name $repoName)) {
+    Write-Host "Creating repository $repoName ..." -ForegroundColor Cyan
+    # Do not pass --source/--remote here: origin may already exist locally and gh will exit 1.
+    Invoke-Gh $Gh repo create $repoName --public --description $repoDesc | Out-Null
+} else {
+    Write-Host "Repository $repoName already exists." -ForegroundColor Cyan
+}
+
 $remotes = Invoke-RepoGit remote
 if (-not ($remotes | Select-String "^origin$")) {
     Invoke-RepoGit remote add origin $remote
 } else {
     Invoke-RepoGit remote set-url origin $remote
-}
-
-if (-not (Test-GhRepo -GhExe $Gh -Name "EinroyVan/BIOQUESTION")) {
-    Write-Host "Creating repository EinroyVan/BIOQUESTION ..." -ForegroundColor Cyan
-    Invoke-Gh $Gh repo create EinroyVan/BIOQUESTION --public --source=. --remote=origin `
-        --description "Biomedical literature extract, quiz, and grade (Gemini + Streamlit)"
-} else {
-    Write-Host "Repository EinroyVan/BIOQUESTION already exists." -ForegroundColor Cyan
 }
 
 $prev = $ErrorActionPreference
@@ -133,9 +141,9 @@ $ErrorActionPreference = $prev
 Write-Host "Pushing to origin main ..." -ForegroundColor Cyan
 Invoke-RepoGit push -u origin main
 
-if (-not (Test-GhRepo -GhExe $Gh -Name "EinroyVan/BIOQUESTION")) {
-    throw "Push finished but https://github.com/EinroyVan/BIOQUESTION is still not visible. Check token has 'repo' scope."
+if (-not (Test-GhRepo -GhExe $Gh -Name $repoName)) {
+    throw "Push finished but https://github.com/$repoName is still not visible. Check token has 'repo' scope."
 }
 
 Write-Host ""
-Write-Host "Done: https://github.com/EinroyVan/BIOQUESTION" -ForegroundColor Green
+Write-Host "Done: https://github.com/$repoName" -ForegroundColor Green
