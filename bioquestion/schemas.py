@@ -37,6 +37,11 @@ class QuestionType(str, Enum):
     SHORT_ANSWER = "short_answer"
 
 
+class QuizMode(str, Enum):
+    NORMAL = "normal"
+    EZ = "ez"
+
+
 class Reference(BaseModel):
     knowledge_point_id: str
     source_quote: str
@@ -64,6 +69,7 @@ class ShortAnswerQuestion(BaseModel):
 
 class QuizResult(BaseModel):
     knowledge_source: str = ""
+    mode: QuizMode = QuizMode.NORMAL
     questions: list[MultipleChoiceQuestion | ShortAnswerQuestion] = Field(
         default_factory=list
     )
@@ -111,4 +117,6 @@ class GradingReport(BaseModel):
     max_score: float = 100.0
     percentage: float
     summary: str = ""
+    scoring_enabled: bool = True
+    quiz_mode: QuizMode = QuizMode.NORMAL
     question_results: list[QuestionGradingResult] = Field(default_factory=list)

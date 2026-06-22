@@ -4,12 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bioquestion"
-version = "1.0.0"
+version = "1.2.0"
 description = "Biomedical literature learning workflow: extract, quiz, grade"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "google-genai>=1.0.0",
+    "openai>=1.40.0",
+    "anthropic>=0.40.0",
+    "deep-translator>=1.11.4",
     "pydantic>=2.7.0",
     "python-dotenv>=1.0.0",
     "rich>=13.7.0",

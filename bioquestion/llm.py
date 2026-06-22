@@ -1,4 +1,4 @@
-"""Google Gemini API client with JSON structured output."""
+"""Multi-provider LLM client with JSON structured output."""
 
 from __future__ import annotations
 
@@ -7,11 +7,14 @@ import os
 import re
 from typing import TypeVar
 
-from google import genai
-from google.genai import types
 from pydantic import BaseModel, ValidationError
 
 from bioquestion import load_project_env
+from bioquestion.providers import (
+    LLMProvider,
+    get_provider_spec,
+    resolve_provider_config,
+)
 
 load_project_env()
 
@@ -57,26 +60,38 @@ def _parse_json_text(text: str) -> dict | list:
 class LLMClient:
     def __init__(
         self,
+        provider: LLMProvider | str | None = None,
         api_key: str | None = None,
         model: str | None = None,
+        base_url: str | None = None,
     ) -> None:
-        self.api_key = api_key or os.getenv("GOOGLE_API_KEY", "")
-        self.model = model or os.getenv("GOOGLE_MODEL", "gemini-3.5-flash")
-        self._client: genai.Client | None = None
+        provider_name = provider or os.getenv("LLM_PROVIDER", LLMProvider.GOOGLE.value)
+        self.provider = LLMProvider(provider_name)
+        self.spec = get_provider_spec(self.provider)
+        self.api_key, self.model, self.base_url = resolve_provider_config(
+            self.provider,
+            api_key=api_key,
+            model=model,
+            base_url=base_url,
+        )
+        self._google_client = None
+        self._openai_client = None
+        self._anthropic_client = None
 
-    @property
-    def client(self) -> genai.Client:
+    def _require_api_key(self) -> None:
         if not self.api_key:
             raise RuntimeError(
-                "GOOGLE_API_KEY is not configured. Copy .env.example to .env and set your key, "
-                "or set the environment variable."
+                f"{self.spec.api_key_env} is not configured for {self.spec.label}. "
+                "Copy .env.example to .env and set the key, or choose another provider in the sidebar."
             )
-        if self._client is None:
-            self._client = genai.Client(api_key=self.api_key)
-        return self._client
 
-    def _generate(self, system_prompt: str, user_prompt: str) -> str:
-        response = self.client.models.generate_content(
+    def _generate_google(self, system_prompt: str, user_prompt: str) -> str:
+        from google import genai
+        from google.genai import types
+
+        if self._google_client is None:
+            self._google_client = genai.Client(api_key=self.api_key)
+        response = self._google_client.models.generate_content(
             model=self.model,
             contents=user_prompt,
             config=types.GenerateContentConfig(
@@ -86,6 +101,50 @@ class LLMClient:
             ),
         )
         return response.text or "{}"
+
+    def _generate_openai(self, system_prompt: str, user_prompt: str) -> str:
+        from openai import OpenAI
+
+        if self._openai_client is None:
+            kwargs = {"api_key": self.api_key}
+            if self.base_url:
+                kwargs["base_url"] = self.base_url
+            self._openai_client = OpenAI(**kwargs)
+        response = self._openai_client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+        )
+        return response.choices[0].message.content or "{}"
+
+    def _generate_anthropic(self, system_prompt: str, user_prompt: str) -> str:
+        import anthropic
+
+        if self._anthropic_client is None:
+            self._anthropic_client = anthropic.Anthropic(api_key=self.api_key)
+        response = self._anthropic_client.messages.create(
+            model=self.model,
+            max_tokens=8192,
+            system=system_prompt + "\n\nReply with JSON only.",
+            messages=[{"role": "user", "content": user_prompt}],
+            temperature=0.2,
+        )
+        parts = [block.text for block in response.content if block.type == "text"]
+        return "".join(parts) or "{}"
+
+    def _generate(self, system_prompt: str, user_prompt: str) -> str:
+        self._require_api_key()
+        if self.provider == LLMProvider.GOOGLE:
+            return self._generate_google(system_prompt, user_prompt)
+        if self.provider in (LLMProvider.OPENAI, LLMProvider.OPENAI_COMPAT):
+            return self._generate_openai(system_prompt, user_prompt)
+        if self.provider == LLMProvider.ANTHROPIC:
+            return self._generate_anthropic(system_prompt, user_prompt)
+        raise RuntimeError(f"Unsupported provider: {self.provider}")
 
     def complete_json(
         self,
@@ -109,4 +168,6 @@ class LLMClient:
                     prompt = user_prompt + _JSON_RETRY_HINT
                 continue
 
-        raise RuntimeError(f"Model JSON could not be parsed or validated (retried {max_retries} times)") from last_error
+        raise RuntimeError(
+            f"Model JSON could not be parsed or validated (retried {max_retries} times)"
+        ) from last_error

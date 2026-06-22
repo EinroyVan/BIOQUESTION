@@ -66,7 +66,7 @@ def cmd_extract(
     output: Path = typer.Option(
         Path("output/knowledge.json"), "--output", "-o", help="Knowledge JSON output path"
     ),
-    model: Optional[str] = typer.Option(None, "--model", "-m", help="Override GOOGLE_MODEL"),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Override model for the active LLM provider"),
 ) -> None:
     """Step 1: Extract knowledge points from literature."""
     text = _read_document(input)
@@ -90,7 +90,7 @@ def cmd_quiz(
     output: Path = typer.Option(
         Path("output/quiz.json"), "--output", "-o", help="Quiz JSON output path"
     ),
-    model: Optional[str] = typer.Option(None, "--model", "-m", help="Override GOOGLE_MODEL"),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Override model for the active LLM provider"),
 ) -> None:
     """Step 2: Generate quiz from knowledge points."""
     kp = load_knowledge(knowledge)
@@ -118,7 +118,7 @@ def cmd_grade(
     interactive: bool = typer.Option(
         False, "--interactive", "-I", help="Force interactive answers (ignore --answers)"
     ),
-    model: Optional[str] = typer.Option(None, "--model", "-m", help="Override GOOGLE_MODEL"),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Override model for the active LLM provider"),
 ) -> None:
     """Step 3: Grade user answers and generate feedback."""
     quiz_data = load_quiz(quiz)
@@ -151,7 +151,7 @@ def cmd_pipeline(
     skip_grade: bool = typer.Option(
         False, "--skip-grade", help="Extract and quiz only; skip grading"
     ),
-    model: Optional[str] = typer.Option(None, "--model", "-m", help="Override GOOGLE_MODEL"),
+    model: Optional[str] = typer.Option(None, "--model", "-m", help="Override model for the active LLM provider"),
 ) -> None:
     """Run full pipeline: extract → quiz → (optional) grade."""
     output_dir.mkdir(parents=True, exist_ok=True)

@@ -2,14 +2,17 @@
 
 Biomedical literature learning workflow: **extract knowledge points → generate quiz → grade answers**.
 
-Uses Google Gemini API with a Streamlit web UI and CLI.
+Streamlit web UI + CLI. **v1.2** adds multi-provider LLM support and Google Translate UI localization.
 
 ## Features
 
 - Upload **TXT** or **PDF** (with OCR for scanned pages)
 - Extract entities, mechanisms, and findings with source quotes
-- Generate 3 multi-select + 2 short-answer questions
-- AI grading with detailed feedback
+- **Normal mode**: 5 multi-select + 2 short-answer; 100-point scoring
+- **EZ mode**: 4 single-choice + 1 short-answer; feedback only
+- Multi-provider LLM: **Google Gemini**, **OpenAI**, **Anthropic Claude**, **OpenAI-compatible**
+- UI languages: English, 中文, 日本語, 한국어, Русский, Español, Deutsch, Português, Tiếng Việt (Google Translate)
+- Personal score trend chart and team leaderboard placeholder
 
 ## Setup
 
@@ -18,8 +21,22 @@ cd BIOQUESTION
 python -m pip install -r requirements.txt
 python -m pip install -e .
 copy .env.example .env   # Windows
-# Edit .env and set GOOGLE_API_KEY
 ```
+
+### API keys (`.env`)
+
+Local config keeps **Google** variable names by default:
+
+| Provider | Environment variables |
+|----------|----------------------|
+| Google Gemini (default) | `GOOGLE_API_KEY`, `GOOGLE_MODEL` |
+| OpenAI | `OPENAI_API_KEY`, `OPENAI_MODEL`, optional `OPENAI_BASE_URL` |
+| Anthropic | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` |
+| OpenAI-compatible | `OPENAI_COMPAT_API_KEY`, `OPENAI_COMPAT_BASE_URL`, `OPENAI_COMPAT_MODEL` |
+
+Choose the active provider in the Streamlit sidebar (session only; `.env` is not modified).
+
+UI translation uses **Google Translate** via `deep-translator` and does **not** consume LLM tokens.
 
 ## Web UI (recommended)
 
@@ -39,6 +56,8 @@ python main.py quiz -k output/knowledge.json -o output/quiz.json
 python main.py grade -q output/quiz.json -I -o output/grading.json
 python main.py pipeline -i examples/literature_sample.txt -d output
 ```
+
+Set `LLM_PROVIDER=google` (or `openai`, `anthropic`, `openai_compatible`) in `.env` for CLI defaults.
 
 ## Project structure
 
