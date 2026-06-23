@@ -1,4 +1,4 @@
-"""Biomedical literature learning workflow: extract → quiz → grade."""
+"""Natural-science literature learning workflow: extract → quiz → grade."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-__version__ = "1.2.2"
+__version__ = "1.3.0"
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = PROJECT_ROOT / ".env"

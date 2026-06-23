@@ -7,14 +7,14 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from bioquestion.i18n import (
+from questioner.i18n import (
     augment_system_prompt_for_language,
     get_output_language_name,
     translate_content,
 )
-from bioquestion.llm import LLMClient
-from bioquestion.prompts import GRADE_EASY_SHORT_ANSWER_SYSTEM, GRADE_SHORT_ANSWER_SYSTEM
-from bioquestion.schemas import (
+from questioner.llm import LLMClient
+from questioner.prompts import GRADE_EASY_SHORT_ANSWER_SYSTEM, GRADE_SHORT_ANSWER_SYSTEM
+from questioner.schemas import (
     ChoiceGradingDetail,
     GradingReport,
     LogicQuestion,
@@ -28,7 +28,7 @@ from bioquestion.schemas import (
     UserAnswer,
     UserAnswerSheet,
 )
-from bioquestion.scoring import (
+from questioner.scoring import (
     LOGIC_MAX_SCORE,
     MS_MAX_SCORE,
     SA_MAX_SCORE,

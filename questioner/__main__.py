@@ -1,4 +1,4 @@
-from bioquestion.cli import app
+from questioner.cli import app
 
 if __name__ == "__main__":
     app()

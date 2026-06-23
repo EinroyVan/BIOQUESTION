@@ -19,14 +19,14 @@ Choose:
 - HTTPS
 - **Login with a web browser** (this opens the auth window you asked for)
 
-## 2. Push BioQuestion
+## 2. Push Questioner
 
 ```powershell
 cd E:\BIOQUESTION
 .\scripts\push_bioquestion.ps1
 ```
 
-Creates: https://github.com/EinroyVan/BIOQUESTION
+Creates / updates: https://github.com/EinroyVan/BIOQUESTION (project name: **Questioner**)
 
 ## 3. Push BioReader (PaperReader)
 

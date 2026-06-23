@@ -1,4 +1,4 @@
-"""Streamlit web UI for the biomedical literature learning workflow."""
+"""Streamlit web UI for the Questioner natural-science learning workflow."""
 
 from __future__ import annotations
 
@@ -18,16 +18,16 @@ from dotenv import load_dotenv
 _ENV_FILE = _PROJECT_ROOT / ".env"
 load_dotenv(_ENV_FILE, override=False)
 
-from bioquestion import __version__
-from bioquestion.extract import extract_knowledge, save_knowledge
-from bioquestion.grade import grade_answers, save_report
-from bioquestion.i18n import LANGUAGES, apply_placeholders, build_translation_map
-from bioquestion.llm import LLMClient
-from bioquestion.pdf_reader import load_uploaded_document
-from bioquestion.providers import LLMProvider, PROVIDER_SPECS, provider_is_configured
-from bioquestion.quiz import generate_quiz, save_quiz
-from bioquestion.report_note import build_study_report_bundle
-from bioquestion.schemas import (
+from questioner import __version__
+from questioner.extract import extract_knowledge, save_knowledge
+from questioner.grade import grade_answers, save_report
+from questioner.i18n import LANGUAGES, apply_placeholders, build_translation_map
+from questioner.llm import LLMClient
+from questioner.pdf_reader import load_uploaded_document
+from questioner.providers import LLMProvider, PROVIDER_SPECS, provider_is_configured
+from questioner.quiz import generate_quiz, save_quiz
+from questioner.report_note import build_study_report_bundle
+from questioner.schemas import (
     CustomQuizCounts,
     GradingReport,
     KnowledgeExtractionResult,
@@ -41,7 +41,7 @@ from bioquestion.schemas import (
     UserAnswer,
     UserAnswerSheet,
 )
-from bioquestion.stats import (
+from questioner.stats import (
     LEADERBOARD_API_PORT,
     UserProfile,
     append_score_record,
@@ -53,7 +53,7 @@ from bioquestion.stats import (
     save_profile,
     validate_nickname,
 )
-from bioquestion.ui_strings import UI_STRINGS
+from questioner.ui_strings import UI_STRINGS
 
 STEP_KEYS = [
     "step.literature_input",
@@ -745,38 +745,45 @@ def _step_grading() -> None:
                     )
                 )
                 c2.write(t("grading.correct_answer", answer=", ".join(d.correct_answers)))
-                if d.missed:
-                    c3.error(t("grading.missed", items=", ".join(d.missed)))
-                if d.extra:
-                    c3.warning(t("grading.extra", items=", ".join(d.extra)))
-                if d.missed and len(d.missed) > 2:
-                    st.error(t("grading.missed_zero", items=", ".join(d.missed)))
-                elif (
-                    d.missed
-                    and d.wrong
-                    and len(d.correct_answers) == 1
-                ):
-                    st.error(
-                        t(
-                            "grading.single_miss_wrong_zero",
-                            missed=", ".join(d.missed),
-                            wrong=", ".join(d.wrong),
+                if item.question_type == QuestionType.LOGIC:
+                    if d.is_correct:
+                        st.success(t("grading.logic_full", score=f"{item.score:.0f}"))
+                    else:
+                        st.error(t("grading.logic_zero"))
+                elif item.question_type == QuestionType.SINGLE_CHOICE:
+                    if d.is_correct:
+                        c3.success(t("grading.verdict_ok"))
+                    elif d.wrong:
+                        c3.error(t("grading.incorrect", items=", ".join(d.wrong)))
+                elif item.question_type == QuestionType.MULTIPLE_CHOICE:
+                    if d.missed:
+                        c3.error(t("grading.missed", items=", ".join(d.missed)))
+                    if d.extra:
+                        c3.warning(t("grading.extra", items=", ".join(d.extra)))
+                    if d.missed and len(d.missed) > 2:
+                        st.error(t("grading.missed_zero", items=", ".join(d.missed)))
+                    elif d.missed and d.wrong and len(d.correct_answers) == 1:
+                        st.error(
+                            t(
+                                "grading.single_miss_wrong_zero",
+                                missed=", ".join(d.missed),
+                                wrong=", ".join(d.wrong),
+                            )
                         )
-                    )
-                elif d.missed and len(d.missed) == 2 and d.wrong:
-                    st.error(
-                        t(
-                            "grading.two_miss_wrong",
-                            missed=", ".join(d.missed),
-                            wrong=", ".join(d.wrong),
+                    elif d.missed and len(d.missed) == 2 and d.wrong:
+                        st.error(
+                            t(
+                                "grading.two_miss_wrong",
+                                missed=", ".join(d.missed),
+                                wrong=", ".join(d.wrong),
+                            )
                         )
-                    )
-                elif d.missed and len(d.missed) == 2:
-                    st.warning(t("grading.two_miss_cap", items=", ".join(d.missed)))
-                elif d.wrong and len(d.wrong) >= 2:
-                    st.error(t("grading.two_wrong_zero", items=", ".join(d.wrong)))
-                elif d.wrong:
-                    c3.error(t("grading.wrong_penalty", items=", ".join(d.wrong)))
+                    elif d.missed and len(d.missed) == 2:
+                        st.warning(t("grading.two_miss_cap", items=", ".join(d.missed)))
+                    elif d.wrong and len(d.wrong) >= 2:
+                        st.error(t("grading.two_wrong_zero", items=", ".join(d.wrong)))
+                    elif d.wrong:
+                        c3.error(t("grading.wrong_penalty", items=", ".join(d.wrong)))
             elif item.choice_detail:
                 d = item.choice_detail
                 c1, c2 = st.columns(2)

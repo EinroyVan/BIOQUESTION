@@ -8,11 +8,11 @@ import re
 from pathlib import Path
 from typing import Any
 
-from bioquestion import PROJECT_ROOT
-from bioquestion.ui_strings import UI_STRINGS
+from questioner import PROJECT_ROOT
+from questioner.ui_strings import UI_STRINGS
 
 CACHE_DIR = PROJECT_ROOT / ".cache" / "i18n"
-I18N_CACHE_VERSION = 4
+I18N_CACHE_VERSION = 5
 
 LANGUAGES: dict[str, str] = {
     "en": "English",

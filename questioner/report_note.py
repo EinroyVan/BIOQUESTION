@@ -9,7 +9,7 @@ from typing import Any
 
 import fitz
 
-from bioquestion.schemas import (
+from questioner.schemas import (
     GradingReport,
     KnowledgeExtractionResult,
     KnowledgePoint,
@@ -356,7 +356,7 @@ def build_report_markdown(
     weak = _collect_weak_points(report, quiz, answers)
 
     lines: list[str] = [
-        "# BioQuestion Learning Report",
+        "# Questioner Learning Report",
         "",
         f"- **Source:** {source_label}",
         f"- **Generated:** {ts}",
@@ -460,7 +460,7 @@ def build_report_html(
     weak = _collect_weak_points(report, quiz, answers)
 
     parts: list[str] = [
-        "<h1>BioQuestion Learning Report</h1>",
+        "<h1>Questioner Learning Report</h1>",
         f'<p class="meta"><strong>Source:</strong> {_esc(source_label)}<br/>'
         f"<strong>Generated:</strong> {_esc(ts)}</p>",
         f'<div class="score-box"><strong>Total score:</strong> '
@@ -584,7 +584,7 @@ def build_study_report_bundle(
     generated_at: datetime | None = None,
 ) -> dict[str, Any]:
     ts = generated_at or datetime.now()
-    stem = f"bioquestion_report_{ts:%Y%m%d_%H%M%S}"
+    stem = f"questioner_report_{ts:%Y%m%d_%H%M%S}"
     kwargs = {
         "source_label": source_label,
         "generated_at": ts,

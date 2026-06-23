@@ -11,7 +11,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from bioquestion.schemas import GradingReport, QuizMode
+from questioner.schemas import GradingReport, QuizMode
 
 HISTORY_PATH = Path("output") / "stats" / "score_history.jsonl"
 PROFILE_PATH = Path("output") / "stats" / "profile.json"

@@ -3,9 +3,9 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "bioquestion"
-version = "1.2.2"
-description = "Biomedical literature learning workflow: extract, quiz, grade"
+name = "questioner"
+version = "1.3.0"
+description = "Natural-science literature learning workflow: extract, quiz, grade"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -26,8 +26,8 @@ dependencies = [
 ]
 
 [project.scripts]
-bioquestion = "bioquestion.cli:app"
+questioner = "questioner.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["bioquestion*"]
+include = ["questioner*"]

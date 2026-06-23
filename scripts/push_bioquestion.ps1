@@ -116,7 +116,7 @@ if ($status) {
 
 $remote = "https://github.com/EinroyVan/BIOQUESTION.git"
 $repoName = "EinroyVan/BIOQUESTION"
-$repoDesc = "Biomedical literature extract, quiz, and grade (Gemini + Streamlit)"
+$repoDesc = "Questioner — natural-science literature extract, quiz, and grade (Streamlit + multi-LLM)"
 
 if (-not (Test-GhRepo -GhExe $Gh -Name $repoName)) {
     Write-Host "Creating repository $repoName ..." -ForegroundColor Cyan

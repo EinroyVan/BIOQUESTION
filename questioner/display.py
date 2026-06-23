@@ -6,7 +6,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from bioquestion.schemas import (
+from questioner.schemas import (
     GradingReport,
     KnowledgeExtractionResult,
     MultipleChoiceQuestion,

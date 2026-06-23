@@ -1,4 +1,4 @@
-"""Step 1: Extract knowledge points from biomedical literature."""
+"""Step 1: Extract knowledge points from natural-science literature."""
 
 from __future__ import annotations
 
@@ -7,10 +7,10 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from bioquestion.i18n import augment_system_prompt_for_language
-from bioquestion.llm import LLMClient
-from bioquestion.prompts import EXTRACT_SYSTEM
-from bioquestion.schemas import KnowledgeExtractionResult, KnowledgePoint
+from questioner.i18n import augment_system_prompt_for_language
+from questioner.llm import LLMClient
+from questioner.prompts import EXTRACT_SYSTEM
+from questioner.schemas import KnowledgeExtractionResult, KnowledgePoint
 
 MAX_INPUT_CHARS = 18000
 
@@ -42,7 +42,7 @@ def extract_knowledge(
     system = augment_system_prompt_for_language(EXTRACT_SYSTEM, language)
     response = client.complete_json(
         system,
-        f"Analyze the following biomedical literature excerpt:\n\n{trimmed}",
+        f"Analyze the following natural-science literature excerpt:\n\n{trimmed}",
         _ExtractLLMResponse,
     )
     return KnowledgeExtractionResult(

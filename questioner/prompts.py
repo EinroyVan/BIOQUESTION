@@ -1,6 +1,6 @@
 """Prompt templates for the three workflow steps."""
 
-from bioquestion.schemas import LOGIC_OPTION_KEYS
+from questioner.schemas import LOGIC_OPTION_KEYS
 
 _LOGIC_OPTIONS_DOC = """
 Logic block (e.g. Q6–Q8): ONE shared master option set for all logic sub-questions.
@@ -16,13 +16,14 @@ Leave stem empty. Do NOT restate options A–E in the stem.
 Set correct_answer to exactly one letter A–E for automatic script grading (no LLM grading for logic).
 """
 
-EXTRACT_SYSTEM = """You are a senior computational biologist and biomedical literature analyst.
-Extract the most academically valuable and clinically meaningful knowledge points from the excerpt.
+EXTRACT_SYSTEM = """You are a senior researcher and natural-science literature analyst.
+Extract the most academically valuable knowledge points from the excerpt across any natural science field
+(physics, chemistry, biology, earth science, astronomy, materials science, etc.).
 
 Steps:
-1. Identify core entities: genes, proteins, RNA modifications (e.g., m6A), metabolites, drugs, disease models, etc.
-2. Map mechanisms and pathways: interactions, signaling cascades, epigenetic changes.
-3. Extract key data/conclusions: statistically significant results, cohort characteristics, main findings.
+1. Identify core entities: concepts, species, compounds, materials, phenomena, methods, models, etc.
+2. Map mechanisms and relationships: causal links, processes, interactions, governing principles.
+3. Extract key data/conclusions: statistically significant results, experimental findings, main claims.
 
 Output (JSON):
 {
@@ -47,7 +48,7 @@ Rules:
 - Output must be strictly valid JSON: escape double quotes inside strings, no comments or trailing commas."""
 
 
-QUIZ_NORMAL_SYSTEM = f"""You are a rigorous medical educator.
+QUIZ_NORMAL_SYSTEM = f"""You are a rigorous natural-science educator.
 Generate assessment questions that test deep understanding of the provided literature knowledge points.
 
 Rules:
@@ -57,7 +58,7 @@ Rules:
 {_LOGIC_OPTIONS_DOC}
 4. Single-choice / multiple-choice / logic answers are graded by script — you MUST set correct_answer or correct_answers accurately.
 5. Short-answer Q9 strictly from paper; Q10 may extend slightly if grounded in findings.
-6. Depth: mechanism reasoning, experimental design logic, or clinical significance.
+6. Depth: mechanism reasoning, experimental design logic, or scientific significance.
 7. Strict paper fidelity for facts; do not invent unsupported claims.
 
 Output JSON:
@@ -95,7 +96,7 @@ Output JSON:
 }}"""
 
 
-QUIZ_EASY_SYSTEM = """You are a rigorous medical educator.
+QUIZ_EASY_SYSTEM = """You are a rigorous natural-science educator.
 Generate a lighter Easy-mode quiz for quick comprehension checks.
 
 Rules:
@@ -103,7 +104,7 @@ Rules:
 2. Each single-choice question must have exactly 4 options (A, B, C, D) and exactly ONE correct answer (field correct_answer as a single letter). Answers are script-graded — set correct_answer accurately.
 3. Use type "single_choice" for Q1–Q4.
 4. Questions must be answerable from the provided knowledge points and source quotes.
-5. Depth: mechanism reasoning, experimental logic, or clinical significance.
+5. Depth: mechanism reasoning, experimental logic, or scientific significance.
 
 Output JSON:
 {
@@ -132,7 +133,7 @@ Output JSON:
 
 def build_custom_quiz_system(counts: dict[str, int]) -> str:
     sc, ms, lg, sa = counts["single_choice"], counts["multiple_choice"], counts["logic"], counts["short_answer"]
-    return f"""You are a rigorous medical educator.
+    return f"""You are a rigorous natural-science educator.
 Generate a custom quiz with exactly:
 - {sc} single-choice question(s) (type single_choice, 4 options A–D, field correct_answer)
 - {ms} multiple-select question(s) (type multiple_choice, 5 options A–E, field correct_answers)

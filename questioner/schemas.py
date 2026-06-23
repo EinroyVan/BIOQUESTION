@@ -1,4 +1,4 @@
-"""Pydantic models for the three-step biomedical literature workflow."""
+"""Pydantic models for the three-step natural-science literature workflow."""
 
 from __future__ import annotations
 

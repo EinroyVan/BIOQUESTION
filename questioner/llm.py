@@ -9,8 +9,8 @@ from typing import TypeVar
 
 from pydantic import BaseModel, ValidationError
 
-from bioquestion import load_project_env
-from bioquestion.providers import (
+from questioner import load_project_env
+from questioner.providers import (
     LLMProvider,
     get_provider_spec,
     resolve_provider_config,

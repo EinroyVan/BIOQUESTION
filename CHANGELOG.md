@@ -1,6 +1,24 @@
 # Changelog
 
-All notable changes to BioQuestion are documented in this file.
+All notable changes to Questioner are documented in this file.
+
+## [1.3.0] — 2026-06-22
+
+### Rebrand: BioQuestion → Questioner
+
+- Project renamed **Questioner** for all **natural sciences** (not limited to biomedicine).
+- Python package renamed `bioquestion` → `questioner`; CLI entry point `questioner`.
+- Prompts and UI copy broadened to physics, chemistry, biology, earth science, astronomy, etc.
+
+### Documentation
+
+- Updated English [README.md](README.md).
+- Added Chinese [README.zh-CN.md](README.zh-CN.md).
+
+### Logic scoring
+
+- Logic questions use **independent all-or-nothing** scoring (6 pts correct, 0 pts wrong).
+- Grading UI no longer applies multi-select partial-credit rules to logic items.
 
 ## [1.2.2] — 2026-06-22
 

@@ -10,16 +10,16 @@ import typer
 from rich.console import Console
 from rich.prompt import Prompt
 
-from bioquestion import __version__
-from bioquestion.display import print_grading, print_knowledge, print_quiz
-from bioquestion.extract import extract_knowledge, load_knowledge, save_knowledge
-from bioquestion.grade import grade_answers, load_answers, save_report
-from bioquestion.llm import LLMClient
-from bioquestion.quiz import generate_quiz, load_quiz, save_quiz
-from bioquestion.schemas import UserAnswer, UserAnswerSheet
+from questioner import __version__
+from questioner.display import print_grading, print_knowledge, print_quiz
+from questioner.extract import extract_knowledge, load_knowledge, save_knowledge
+from questioner.grade import grade_answers, load_answers, save_report
+from questioner.llm import LLMClient
+from questioner.quiz import generate_quiz, load_quiz, save_quiz
+from questioner.schemas import UserAnswer, UserAnswerSheet
 
 app = typer.Typer(
-    help="Biomedical literature workflow: extract → quiz → grade",
+    help="Natural-science literature workflow: extract → quiz → grade",
     no_args_is_help=True,
 )
 console = Console()
@@ -29,7 +29,7 @@ def _read_document(path: Path) -> str:
     if not path.exists():
         raise typer.BadParameter(f"File not found: {path}")
     if path.suffix.lower() == ".pdf":
-        from bioquestion.pdf_reader import load_uploaded_document
+        from questioner.pdf_reader import load_uploaded_document
 
         text, _ = load_uploaded_document(path.name, path.read_bytes())
         return text
@@ -56,7 +56,7 @@ def main(
     version: bool = typer.Option(False, "--version", "-v", help="Show version"),
 ) -> None:
     if version:
-        console.print(f"bioquestion {__version__}")
+        console.print(f"questioner {__version__}")
         raise typer.Exit()
 
 

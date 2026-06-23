@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from bioquestion.schemas import (
+from questioner.schemas import (
     CustomQuizCounts,
     LogicQuestion,
     MultipleChoiceQuestion,
@@ -141,6 +141,7 @@ def score_logic_question(
     question: LogicQuestion,
     user_selected: list[str],
 ) -> tuple[float, ChoiceGradingDetail, bool]:
+    """Score logic items independently: full 6 pts if correct, else 0 (no partial credit)."""
     user_set = set(user_selected)
     correct = question.correct_answer
     is_correct = user_set == {correct} and len(user_set) == 1

@@ -7,10 +7,10 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from bioquestion.i18n import augment_system_prompt_for_language, get_output_language_name
-from bioquestion.llm import LLMClient
-from bioquestion.prompts import QUIZ_EASY_SYSTEM, QUIZ_NORMAL_SYSTEM, build_custom_quiz_system
-from bioquestion.schemas import (
+from questioner.i18n import augment_system_prompt_for_language, get_output_language_name
+from questioner.llm import LLMClient
+from questioner.prompts import QUIZ_EASY_SYSTEM, QUIZ_NORMAL_SYSTEM, build_custom_quiz_system
+from questioner.schemas import (
     CustomQuizCounts,
     KnowledgeExtractionResult,
     LOGIC_OPTION_KEYS,
@@ -22,7 +22,7 @@ from bioquestion.schemas import (
     ShortAnswerQuestion,
     SingleChoiceQuestion,
 )
-from bioquestion.scoring import (
+from questioner.scoring import (
     EASY_SA_COUNT,
     EASY_SC_COUNT,
     MS_OPTION_KEYS,

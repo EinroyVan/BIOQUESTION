@@ -1,31 +1,32 @@
-# BioQuestion
+# Questioner
 
-Biomedical literature learning workflow: **extract knowledge points → generate quiz → grade answers**.
+Natural-science literature learning workflow: **extract knowledge points → generate quiz → grade answers**.
 
-Streamlit web UI + CLI. **v1.2** adds multi-provider LLM support and Google Translate UI localization.
+Works across physics, chemistry, biology, earth science, astronomy, materials science, and related fields. Streamlit web UI + CLI.
+
+**中文文档：** [README.zh-CN.md](README.zh-CN.md)
 
 ## Features
 
 - Upload **TXT** or **PDF** (with OCR for scanned pages)
 - Extract entities, mechanisms, and findings with source quotes
-- **Normal mode**: 5 multi-select + 2 short-answer; 100-point scoring
-- **EZ mode**: 4 single-choice + 1 short-answer; feedback only
+- **Normal mode**: 5 multi-select (10 pts) + 3 logic (6 pts, all-or-nothing) + 2 short-answer (16 pts); total 100
+- **Easy mode**: 4 single-choice (A–D) + 1 short-answer; feedback only
+- **Custom mode**: configure your own question mix
 - Multi-provider LLM: **Google Gemini**, **OpenAI**, **Anthropic Claude**, **OpenAI-compatible**
-- UI languages: English, 中文, 日本語, 한국어, Русский, Español, Deutsch, Português, Tiếng Việt (Google Translate)
-- Personal score trend chart and team leaderboard placeholder
+- UI languages via Google Translate (English, 中文, 日本語, 한국어, and more)
+- Personal score history (local) with nickname; team leaderboard placeholder
 
 ## Setup
 
 ```bash
-cd BIOQUESTION
+cd Questioner   # or your clone directory
 python -m pip install -r requirements.txt
 python -m pip install -e .
 copy .env.example .env   # Windows
 ```
 
 ### API keys (`.env`)
-
-Local config keeps **Google** variable names by default:
 
 | Provider | Environment variables |
 |----------|----------------------|
@@ -62,13 +63,19 @@ Set `LLM_PROVIDER=google` (or `openai`, `anthropic`, `openai_compatible`) in `.e
 ## Project structure
 
 ```
-BIOQUESTION/
+Questioner/
 ├── app.py              # Streamlit entry
 ├── main.py             # CLI entry
-├── bioquestion/        # Python package
+├── questioner/         # Python package
 ├── examples/
 └── .streamlit/         # Port 8502
 ```
+
+## Scoring notes
+
+- **Single-choice / multi-select / logic**: script-graded from generated answer keys (no LLM tokens).
+- **Logic questions**: independent scoring — correct = 6 pts, wrong = 0 pts (not subject to multi-select partial-credit rules).
+- **Short-answer**: LLM grading with partial credit.
 
 ## Security
 

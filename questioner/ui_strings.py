@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 UI_STRINGS: dict[str, str] = {
-    "app.title": "BioQuestion",
+    "app.title": "Questioner",
     "app.tagline": "Extract → Quiz → Grade",
-    "app.page_title": "BioQuestion",
+    "app.page_title": "Questioner",
     "sidebar.language": "Interface language",
     "sidebar.language_hint": (
         "UI translation via Google Translate (does not use your LLM API). "
@@ -44,7 +44,8 @@ UI_STRINGS: dict[str, str] = {
     "common.back_quiz": "← Back to Quiz",
     "input.header": "Step 1 · [[step]]",
     "input.intro": (
-        "Upload a `.txt` or `.pdf` file, or paste a biomedical literature excerpt. "
+        "Upload a `.txt` or `.pdf` file, or paste a natural-science literature excerpt "
+        "(physics, chemistry, biology, earth science, astronomy, etc.). "
         "Scanned PDFs are processed with OCR automatically."
     ),
     "input.upload": "Upload document",
@@ -115,7 +116,7 @@ UI_STRINGS: dict[str, str] = {
     "quiz.select_one": "Select one answer",
     "quiz.select_many": "Select answer(s)",
     "quiz.your_answer": "Your answer",
-    "quiz.answer_ph": "Address mechanism, experimental logic, or clinical significance…",
+    "quiz.answer_ph": "Address mechanism, experimental logic, or scientific significance…",
     "quiz.submit": "Submit & Grade",
     "quiz.unanswered": "Please answer all questions. Unanswered: [[ids]]",
     "quiz.grading": "Grading…",
@@ -140,6 +141,8 @@ UI_STRINGS: dict[str, str] = {
     "grading.missed_zero": "Missed ([[items]]): more than two misses — question scored 0.",
     "grading.two_miss_wrong": "Two missed ([[missed]]) and wrong ([[wrong]]) — question scored 0.",
     "grading.two_miss_cap": "Two missed ([[items]]): question capped at 2 pts.",
+    "grading.logic_full": "Correct — full credit ([[score]]/6 pts).",
+    "grading.logic_zero": "Incorrect — 0/6 pts (logic questions: all-or-nothing scoring).",
     "grading.single_miss_wrong_zero": (
         "Only one correct option; one miss ([[missed]]) and one wrong ([[wrong]]) — question scored 0."
     ),
