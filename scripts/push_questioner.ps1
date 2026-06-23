@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-  Push BIOQUESTION to https://github.com/EinroyVan/BIOQUESTION
+  Push Questioner to https://github.com/EinroyVan/Questioner
 #>
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
@@ -87,9 +87,10 @@ if ($env:GH_TOKEN) {
     Write-Host "Using GH_TOKEN from environment." -ForegroundColor Cyan
 }
 
+$AuthScript = Join-Path $PSScriptRoot "auth_github.ps1"
 if (-not (Test-GhAuth -GhExe $Gh)) {
     Write-Host ""
-    Write-Host "Not authenticated. Run: E:\BIOQUESTION\scripts\auth_github.ps1" -ForegroundColor Yellow
+    Write-Host "Not authenticated. Run: $AuthScript" -ForegroundColor Yellow
     Write-Host "Or set: `$env:GH_TOKEN = 'your-token'" -ForegroundColor Yellow
     throw "GitHub authentication required."
 }
@@ -114,16 +115,16 @@ if ($status) {
     }
 }
 
-$remote = "https://github.com/EinroyVan/BIOQUESTION.git"
-$repoName = "EinroyVan/BIOQUESTION"
+$remote = "https://github.com/EinroyVan/Questioner.git"
+$repoName = "EinroyVan/Questioner"
 $repoDesc = "Questioner — natural-science literature extract, quiz, and grade (Streamlit + multi-LLM)"
 
 if (-not (Test-GhRepo -GhExe $Gh -Name $repoName)) {
     Write-Host "Creating repository $repoName ..." -ForegroundColor Cyan
-    # Do not pass --source/--remote here: origin may already exist locally and gh will exit 1.
     Invoke-Gh $Gh repo create $repoName --public --description $repoDesc | Out-Null
 } else {
     Write-Host "Repository $repoName already exists." -ForegroundColor Cyan
+    Invoke-Gh $Gh repo edit $repoName --description $repoDesc | Out-Null
 }
 
 $remotes = Invoke-RepoGit remote

@@ -2,6 +2,15 @@
 
 All notable changes to Questioner are documented in this file.
 
+## [1.3.1] — 2026-06-22
+
+### Repository & paths
+
+- GitHub remote updated to **EinroyVan/Questioner** (repo renamed on GitHub).
+- Local project folder: **E:\\Questioner** (was `E:\\BIOQUESTION`).
+- Push script renamed `push_questioner.ps1`; scripts use `$RepoRoot` instead of hardcoded paths.
+- GitHub About/description updated for natural-science Questioner.
+
 ## [1.3.0] — 2026-06-22
 
 ### Rebrand: BioQuestion → Questioner

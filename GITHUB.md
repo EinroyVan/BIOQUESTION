@@ -22,11 +22,11 @@ Choose:
 ## 2. Push Questioner
 
 ```powershell
-cd E:\BIOQUESTION
-.\scripts\push_bioquestion.ps1
+cd E:\Questioner
+.\scripts\push_questioner.ps1
 ```
 
-Creates / updates: https://github.com/EinroyVan/BIOQUESTION (project name: **Questioner**)
+Repository: https://github.com/EinroyVan/Questioner
 
 ## 3. Push BioReader (PaperReader)
 
@@ -41,7 +41,7 @@ Creates: https://github.com/EinroyVan/bioreader
 
 | Project | Excluded files |
 |---------|----------------|
-| BIOQUESTION | `.env`, `output/`, `.venv/`, `*.egg-info/` |
+| Questioner | `.env`, `output/`, `.venv/`, `*.egg-info/` |
 | BioReader | `.streamlit/secrets.toml`, `.venv/`, test payloads |
 
 ## Note on "bioreader"

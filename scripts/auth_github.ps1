@@ -11,6 +11,8 @@ if (-not (Test-Path $Gh)) {
     throw "Install GitHub CLI: winget install GitHub.cli"
 }
 
+$PublishScript = Join-Path (Split-Path -Parent $PSScriptRoot) "scripts\publish_all.ps1"
+
 function Test-GhLoggedIn {
     $out = & $Gh auth status 2>&1 | Out-String
     return ($LASTEXITCODE -eq 0) -and ($out -notmatch "not logged in")
@@ -43,7 +45,7 @@ if (Test-GhLoggedIn) {
     & $Gh auth status
     & $Gh auth setup-git
     Write-Host ""
-    Write-Host "Next, run: E:\BIOQUESTION\scripts\publish_all.ps1" -ForegroundColor Cyan
+    Write-Host "Next, run: $PublishScript" -ForegroundColor Cyan
 } else {
     Write-Host "FAILED - still not logged in." -ForegroundColor Red
     Write-Host ""
@@ -53,6 +55,6 @@ if (Test-GhLoggedIn) {
     Write-Host "  3. In PowerShell run:"
     Write-Host '     $env:GH_TOKEN = "paste-token-here"'
     Write-Host "     & '$Gh' auth setup-git"
-    Write-Host "     E:\BIOQUESTION\scripts\publish_all.ps1"
+    Write-Host "     $PublishScript"
     exit 1
 }
