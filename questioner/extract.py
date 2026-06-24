@@ -1,45 +1,26 @@
-"""Step 1: Extract knowledge points from natural-science literature."""
+"""Step 1: Extract structured literature analysis from natural-science text."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from typing import Any
-
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 from questioner.i18n import augment_system_prompt_for_language
+from questioner.literature_format import literature_analysis_is_substantive
 from questioner.llm import LLMClient
+from questioner.metadata_format import merge_pdf_document_metadata
 from questioner.prompts import EXTRACT_SYSTEM
-from questioner.schemas import KnowledgeExtractionResult, KnowledgePoint
+from questioner.schemas import KnowledgeExtractionResult, LiteratureAnalysis, LiteratureMetadata
 
 MAX_INPUT_CHARS = 18000
 
 
 class _ExtractLLMResponse(BaseModel):
     has_substantive_content: bool = True
-    entities: list[str] = Field(default_factory=list)
-    knowledge_points: list[KnowledgePoint] = Field(default_factory=list)
-    summary: str = ""
-
-    @model_validator(mode="before")
-    @classmethod
-    def _normalize_payload(cls, data: Any) -> Any:
-        if not isinstance(data, dict):
-            return data
-        fixed_kps: list[object] = []
-        for index, item in enumerate(data.get("knowledge_points") or [], start=1):
-            if not isinstance(item, dict):
-                fixed_kps.append(item)
-                continue
-            kp = dict(item)
-            if not str(kp.get("id", "")).strip():
-                kp["id"] = f"KP-{index}"
-            fixed_kps.append(kp)
-        data = dict(data)
-        data["knowledge_points"] = fixed_kps
-        return data
+    literature_analysis: LiteratureAnalysis = Field(default_factory=LiteratureAnalysis)
+    literature_metadata: LiteratureMetadata = Field(default_factory=LiteratureMetadata)
 
 
 def _trim_input(text: str) -> str:
@@ -47,7 +28,7 @@ def _trim_input(text: str) -> str:
         return text
     return (
         text[:MAX_INPUT_CHARS]
-        + "\n\n[Note: text truncated due to length; extract the most important knowledge points from the excerpt above.]"
+        + "\n\n[Note: text truncated due to length; extract the most important content from the excerpt above.]"
     )
 
 
@@ -55,6 +36,9 @@ def extract_knowledge(
     text: str,
     llm: LLMClient | None = None,
     language: str = "en",
+    *,
+    pdf_title: str = "",
+    pdf_author: str = "",
 ) -> KnowledgeExtractionResult:
     client = llm or LLMClient()
     trimmed = _trim_input(text.strip())
@@ -65,12 +49,19 @@ def extract_knowledge(
         f"Analyze the following natural-science literature excerpt:\n\n{trimmed}",
         _ExtractLLMResponse,
     )
+    substantive = response.has_substantive_content and literature_analysis_is_substantive(
+        response.literature_analysis
+    )
+    metadata = merge_pdf_document_metadata(
+        response.literature_metadata,
+        pdf_title=pdf_title,
+        pdf_author=pdf_author,
+    )
     return KnowledgeExtractionResult(
         source_text_preview=preview,
-        has_substantive_content=response.has_substantive_content,
-        entities=response.entities,
-        knowledge_points=response.knowledge_points,
-        summary=response.summary,
+        has_substantive_content=substantive,
+        literature_analysis=response.literature_analysis,
+        literature_metadata=metadata,
     )
 
 

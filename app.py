@@ -21,7 +21,8 @@ load_dotenv(_ENV_FILE, override=False)
 from questioner import __version__
 from questioner.extract import extract_knowledge, save_knowledge
 from questioner.grade import grade_answers, save_report
-from questioner.i18n import LANGUAGES, apply_placeholders, build_translation_map
+from questioner.literature_format import render_literature_analysis_markdown
+from questioner.metadata_format import metadata_is_present, render_metadata_markdown
 from questioner.llm import LLMClient
 from questioner.pdf_reader import load_uploaded_document
 from questioner.providers import LLMProvider, PROVIDER_SPECS, provider_is_configured
@@ -31,6 +32,7 @@ from questioner.schemas import (
     CustomQuizCounts,
     GradingReport,
     KnowledgeExtractionResult,
+    LOGIC_OPTION_KEYS,
     LogicQuestion,
     MultipleChoiceQuestion,
     QuestionType,
@@ -57,16 +59,10 @@ from questioner.ui_strings import UI_STRINGS
 
 STEP_KEYS = [
     "step.literature_input",
-    "step.knowledge_points",
+    "step.literature_analysis",
     "step.quiz",
     "step.grading",
 ]
-
-CATEGORY_KEYS = {
-    "entity": "category.entity",
-    "mechanism": "category.mechanism",
-    "finding": "category.finding",
-}
 
 OUTPUT_DIR = Path("output")
 
@@ -76,19 +72,86 @@ LOGIC_OPTION_UI_KEYS = {
     "C": "quiz.logic_option_c",
     "D": "quiz.logic_option_d",
     "E": "quiz.logic_option_e",
+    "F": "quiz.logic_option_f",
+    "G": "quiz.logic_option_g",
 }
+
+
+def _logic_question_range(quiz: QuizResult) -> str:
+    logic_ids = [q.id for q in quiz.questions if isinstance(q, LogicQuestion)]
+    if not logic_ids:
+        return ""
+    if len(logic_ids) == 1:
+        return logic_ids[0]
+    return f"{logic_ids[0]}–{logic_ids[-1]}"
 
 
 def _logic_option_labels() -> dict[str, str]:
     return {key: t(ui_key) for key, ui_key in LOGIC_OPTION_UI_KEYS.items()}
 
 
-def _render_logic_master_section() -> None:
-    st.markdown(f"### {t('quiz.logic_master_title')}")
-    st.caption(t("quiz.logic_master_intro"))
-    for key in ("A", "B", "C", "D", "E"):
+def _render_logic_shared_options(quiz: QuizResult) -> None:
+    range_label = _logic_question_range(quiz)
+    st.markdown(f"### {range_label} · {t('quiz.logic_shared_options')}")
+    for key in LOGIC_OPTION_KEYS:
         st.markdown(f"**{key}.** {_logic_option_labels()[key]}")
     st.divider()
+
+
+def _literature_section_labels() -> dict[str, str]:
+    return {
+        "introduction": t("literature.introduction"),
+        "methods": t("literature.methods"),
+        "results": t("literature.results"),
+        "discussion": t("literature.discussion"),
+        "hook": t("literature.hook"),
+        "research_gap": t("literature.research_gap"),
+        "proposed_approach": t("literature.proposed_approach"),
+        "technical_innovation": t("literature.technical_innovation"),
+        "benchmarks_evaluation": t("literature.benchmarks_evaluation"),
+        "key_findings": t("literature.key_findings"),
+        "evidence_quality": t("literature.evidence_quality"),
+        "limitations": t("literature.limitations"),
+        "future_directions": t("literature.future_directions"),
+    }
+
+
+def _metadata_section_labels() -> dict[str, str]:
+    return {
+        "header": t("metadata.header"),
+        "title": t("metadata.title"),
+        "journal": t("metadata.journal"),
+        "impact_factor": t("metadata.impact_factor"),
+        "first_author": t("metadata.first_author"),
+        "first_author_affiliation": t("metadata.first_author_affiliation"),
+        "corresponding_author": t("metadata.corresponding_author"),
+        "corresponding_author_affiliation": t("metadata.corresponding_author_affiliation"),
+        "published_date": t("metadata.published_date"),
+        "doi": t("metadata.doi"),
+        "field_tags": t("metadata.field_tags"),
+    }
+
+
+def _render_literature_metadata_ui(knowledge: KnowledgeExtractionResult) -> None:
+    if not metadata_is_present(knowledge.literature_metadata):
+        return
+    with st.expander(t("metadata.header"), expanded=True):
+        lines = render_metadata_markdown(
+            knowledge.literature_metadata,
+            labels=_metadata_section_labels(),
+        )
+        st.markdown("\n".join(lines))
+
+
+def _render_literature_analysis_ui(knowledge: KnowledgeExtractionResult) -> None:
+    lines = render_literature_analysis_markdown(
+        knowledge.literature_analysis,
+        labels=_literature_section_labels(),
+    )
+    if lines:
+        st.markdown("\n".join(lines))
+    else:
+        st.info(t("input.no_kp"))
 
 
 def t(key: str, **kwargs: object) -> str:
@@ -331,7 +394,19 @@ def _step_input() -> None:
             return
         with st.spinner(t("input.extracting")):
             try:
-                knowledge = extract_knowledge(text, _get_llm(), language=_ui_language())
+                pdf_title = ""
+                pdf_author = ""
+                pdf_meta = st.session_state.get("pdf_meta")
+                if pdf_meta and pdf_meta.document_info:
+                    pdf_title = pdf_meta.document_info.title
+                    pdf_author = pdf_meta.document_info.author
+                knowledge = extract_knowledge(
+                    text,
+                    _get_llm(),
+                    language=_ui_language(),
+                    pdf_title=pdf_title,
+                    pdf_author=pdf_author,
+                )
             except Exception as exc:
                 st.error(t("input.extract_failed", error=exc))
                 return
@@ -367,23 +442,10 @@ def _step_knowledge() -> None:
 
     if not knowledge.has_substantive_content:
         st.warning(t("input.no_kp"))
-        if knowledge.summary:
-            st.write(knowledge.summary)
         return
 
-    st.subheader(t("knowledge.summary"))
-    st.info(knowledge.summary)
-
-    if knowledge.entities:
-        st.subheader(t("knowledge.entities"))
-        st.write(", ".join(knowledge.entities))
-
-    st.subheader(t("knowledge.points"))
-    for kp in knowledge.knowledge_points:
-        label = t(CATEGORY_KEYS.get(kp.category.value, kp.category.value))
-        with st.expander(f"**{kp.id}** · {label} · {kp.title}", expanded=False):
-            st.markdown(kp.content)
-            st.caption(t("knowledge.source_quote", quote=kp.source_quote))
+    _render_literature_metadata_ui(knowledge)
+    _render_literature_analysis_ui(knowledge)
 
     st.divider()
     st.caption(t("knowledge.mode_hint"))
@@ -492,14 +554,14 @@ def _step_quiz() -> None:
     for q in quiz.questions:
         if isinstance(q, LogicQuestion):
             if not logic_master_shown:
-                _render_logic_master_section()
+                _render_logic_shared_options(quiz)
                 logic_master_shown = True
             st.markdown(f"### {q.id}")
             st.markdown(f"**α:** {q.description_alpha}")
             st.markdown(f"**β:** {q.description_beta}")
             selected_key = st.radio(
                 t("quiz.logic_pick"),
-                options=["A", "B", "C", "D", "E"],
+                options=list(LOGIC_OPTION_KEYS),
                 horizontal=True,
                 key=f"lg_{q.id}",
                 label_visibility="collapsed",
@@ -574,7 +636,13 @@ def _step_quiz() -> None:
         sheet = UserAnswerSheet(answers=answers)
         with st.spinner(t("quiz.grading")):
             try:
-                report = grade_answers(quiz, sheet, _get_llm(), language=_ui_language())
+                report = grade_answers(
+                    quiz,
+                    sheet,
+                    _get_llm(),
+                    language=_ui_language(),
+                    knowledge=st.session_state.get("knowledge"),
+                )
             except Exception as exc:
                 st.error(t("quiz.grade_failed", error=exc))
                 return
@@ -709,9 +777,6 @@ def _step_grading() -> None:
 
     st.subheader(t("grading.details"))
     quiz_map = {q.id: q for q in quiz.questions} if quiz else {}
-    has_logic = any(item.question_type == QuestionType.LOGIC for item in report.question_results)
-    if has_logic:
-        _render_logic_master_section()
 
     for item in report.question_results:
         verdict = t("grading.verdict_ok") if item.is_correct else t("grading.verdict_bad")
@@ -735,9 +800,9 @@ def _step_grading() -> None:
                 else:
                     st.markdown(t("grading.question", stem=q.stem))
 
-            if item.choice_detail and scoring_enabled:
+            if item.choice_detail:
                 d = item.choice_detail
-                c1, c2, c3 = st.columns(3)
+                c1, c2 = st.columns(2)
                 c1.write(
                     t(
                         "grading.your_answer",
@@ -745,21 +810,34 @@ def _step_grading() -> None:
                     )
                 )
                 c2.write(t("grading.correct_answer", answer=", ".join(d.correct_answers)))
-                if item.question_type == QuestionType.LOGIC:
+
+                if d.option_issue_rationales:
+                    st.markdown(f"**{t('grading.option_breakdown')}**")
+                    issue_keys = sorted(set(d.missed) | set(d.wrong))
+                    for key in issue_keys:
+                        text = d.option_issue_rationales.get(key, "")
+                        if not text:
+                            continue
+                        label = ""
+                        if q and isinstance(q, (SingleChoiceQuestion, MultipleChoiceQuestion)):
+                            label = q.options.get(key, "")
+                        elif q and isinstance(q, LogicQuestion):
+                            label = _logic_option_labels().get(key, "")
+                        line = f"**{key}.** {label} — {text}" if label else f"**{key}.** {text}"
+                        if key in d.wrong:
+                            st.error(line)
+                        else:
+                            st.warning(line)
+
+                if scoring_enabled and item.question_type == QuestionType.LOGIC:
                     if d.is_correct:
                         st.success(t("grading.logic_full", score=f"{item.score:.0f}"))
                     else:
                         st.error(t("grading.logic_zero"))
-                elif item.question_type == QuestionType.SINGLE_CHOICE:
+                elif scoring_enabled and item.question_type == QuestionType.SINGLE_CHOICE:
                     if d.is_correct:
-                        c3.success(t("grading.verdict_ok"))
-                    elif d.wrong:
-                        c3.error(t("grading.incorrect", items=", ".join(d.wrong)))
-                elif item.question_type == QuestionType.MULTIPLE_CHOICE:
-                    if d.missed:
-                        c3.error(t("grading.missed", items=", ".join(d.missed)))
-                    if d.extra:
-                        c3.warning(t("grading.extra", items=", ".join(d.extra)))
+                        st.success(t("grading.verdict_ok"))
+                elif scoring_enabled and item.question_type == QuestionType.MULTIPLE_CHOICE:
                     if d.missed and len(d.missed) > 2:
                         st.error(t("grading.missed_zero", items=", ".join(d.missed)))
                     elif d.missed and d.wrong and len(d.correct_answers) == 1:
@@ -782,22 +860,6 @@ def _step_grading() -> None:
                         st.warning(t("grading.two_miss_cap", items=", ".join(d.missed)))
                     elif d.wrong and len(d.wrong) >= 2:
                         st.error(t("grading.two_wrong_zero", items=", ".join(d.wrong)))
-                    elif d.wrong:
-                        c3.error(t("grading.wrong_penalty", items=", ".join(d.wrong)))
-            elif item.choice_detail:
-                d = item.choice_detail
-                c1, c2 = st.columns(2)
-                c1.write(
-                    t(
-                        "grading.your_answer",
-                        answer=", ".join(d.user_answers) or t("grading.empty_answer"),
-                    )
-                )
-                c2.write(t("grading.correct_answer", answer=", ".join(d.correct_answers)))
-                if d.missed:
-                    st.warning(t("grading.missed", items=", ".join(d.missed)))
-                if d.wrong:
-                    st.error(t("grading.incorrect", items=", ".join(d.wrong)))
 
             if item.short_answer_detail:
                 d = item.short_answer_detail
@@ -805,6 +867,10 @@ def _step_grading() -> None:
                     st.success(t("grading.matched_kw", items=", ".join(d.matched_keywords)))
                 if d.missing_keywords:
                     st.warning(t("grading.missing_kw", items=", ".join(d.missing_keywords)))
+                if d.logic_error:
+                    st.error(t("grading.logic_error_penalty"))
+                if d.concept_confusion:
+                    st.error(t("grading.concept_confusion_penalty"))
                 if d.feedback:
                     st.info(d.feedback)
                 if isinstance(q, ShortAnswerQuestion):
@@ -843,6 +909,7 @@ def _step_grading() -> None:
             knowledge,
             answer_sheet,
             source_label=source_label,
+            metadata_labels=_metadata_section_labels(),
         )
     except Exception as exc:
         st.error(t("grading.report_failed", error=exc))

@@ -72,6 +72,40 @@ def question_max_score(question: Question, mode: QuizMode) -> float:
     return SA_MAX_SCORE
 
 
+def _choice_score_summary(
+    detail: ChoiceGradingDetail,
+    score: float,
+    max_score: float,
+) -> str:
+    """Brief score reason for UI (no per-option fluff)."""
+    if detail.is_correct:
+        return f"Full credit: {score:.0f}/{max_score:.0f}."
+    n_miss = len(detail.missed)
+    n_wrong = len(detail.wrong)
+    single_correct = len(detail.correct_answers) == 1
+
+    if single_correct and n_miss >= 1 and n_wrong >= 1:
+        return f"One miss + one wrong: {score:.0f}/{max_score:.0f}."
+    if n_wrong >= 2:
+        return f"Two or more wrong selections ({', '.join(detail.wrong)}): {score:.0f}/{max_score:.0f}."
+    if n_miss > 2:
+        return f"More than two missed ({', '.join(detail.missed)}): {score:.0f}/{max_score:.0f}."
+    if n_miss == 2 and n_wrong >= 1:
+        return (
+            f"Two missed ({', '.join(detail.missed)}) and wrong ({', '.join(detail.wrong)}): "
+            f"{score:.0f}/{max_score:.0f}."
+        )
+    if n_miss == 2 and n_wrong == 0:
+        return f"Two missed ({', '.join(detail.missed)}): {score:.0f}/{max_score:.0f}."
+    if n_miss == 1 and n_wrong == 1:
+        return f"One miss + one wrong: {score:.0f}/{max_score:.0f}."
+    if n_miss == 1 and n_wrong == 0:
+        return f"One missed ({', '.join(detail.missed)}): {score:.0f}/{max_score:.0f}."
+    if n_miss == 0 and n_wrong == 1:
+        return f"One wrong ({', '.join(detail.wrong)}): {score:.0f}/{max_score:.0f}."
+    return f"Score: {score:.0f}/{max_score:.0f}."
+
+
 def score_multiple_choice(
     question: MultipleChoiceQuestion,
     user_selected: list[str],
@@ -159,59 +193,28 @@ def score_logic_question(
     return score, detail, is_correct
 
 
+def explain_single_choice(
+    question: SingleChoiceQuestion,
+    detail: ChoiceGradingDetail,
+    score: float,
+) -> str:
+    return _choice_score_summary(detail, score, SINGLE_MAX_SCORE)
+
+
 def explain_multiple_choice(
     question: MultipleChoiceQuestion,
     detail: ChoiceGradingDetail,
     score: float,
 ) -> str:
-    parts: list[str] = []
-    if question.explanation:
-        parts.append(question.explanation)
-
-    n_miss = len(detail.missed)
-    n_wrong = len(detail.wrong)
-    single_correct = len(detail.correct_answers) == 1
-
-    if score == MS_MAX_SCORE:
-        parts.append(f"Full credit: {MS_MAX_SCORE:.0f}/{MS_MAX_SCORE:.0f}.")
-    elif single_correct and n_miss >= 1 and n_wrong >= 1:
-        parts.append(
-            "Score 0: only one correct option; one miss and one wrong selection."
-        )
-    elif n_wrong >= 2:
-        parts.append(
-            f"Score 0: {n_wrong} incorrect option(s) selected "
-            f"({', '.join(detail.wrong)})."
-        )
-    elif n_miss > 2:
-        parts.append(
-            f"Score 0: {n_miss} correct option(s) missed ({', '.join(detail.missed)})."
-        )
-    elif n_miss == 2 and n_wrong >= 1:
-        parts.append(
-            f"Score 0: two missed ({', '.join(detail.missed)}) "
-            f"and wrong ({', '.join(detail.wrong)})."
-        )
-    elif n_miss == 2:
-        parts.append(
-            f"Two missed ({', '.join(detail.missed)}): capped at {MS_TWO_MISS_SCORE:.0f} pts."
-        )
-    elif n_miss == 1 and n_wrong == 1:
-        parts.append(
-            f"One missed and one wrong: {MS_ONE_MISS_ONE_WRONG_SCORE:.0f}/{MS_MAX_SCORE:.0f}."
-        )
-    else:
-        if detail.missed:
-            parts.append(f"Missed: {', '.join(detail.missed)} (−2 each).")
-        if detail.wrong:
-            parts.append(f"Wrong: {', '.join(detail.wrong)} (−2 each).")
-        parts.append(f"Score: {score:.0f}/{MS_MAX_SCORE:.0f}.")
-    return " ".join(parts)
+    return _choice_score_summary(detail, score, MS_MAX_SCORE)
 
 
 def explain_logic(detail: ChoiceGradingDetail, score: float) -> str:
     if detail.is_correct:
-        return f"Correct. Full credit: {LOGIC_MAX_SCORE:.0f}/{LOGIC_MAX_SCORE:.0f}."
+        return f"Full credit: {LOGIC_MAX_SCORE:.0f}/{LOGIC_MAX_SCORE:.0f}."
     selected = ", ".join(detail.user_answers) or "(empty)"
     correct = ", ".join(detail.correct_answers)
-    return f"Incorrect (selected {selected}; correct {correct}). Score 0/{LOGIC_MAX_SCORE:.0f}."
+    return (
+        f"Incorrect (selected {selected}; correct {correct}). "
+        f"Score: 0/{LOGIC_MAX_SCORE:.0f}."
+    )

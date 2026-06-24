@@ -8,6 +8,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from questioner.i18n import augment_system_prompt_for_language, get_output_language_name
+from questioner.literature_format import literature_analysis_is_substantive
 from questioner.llm import LLMClient
 from questioner.prompts import QUIZ_EASY_SYSTEM, QUIZ_NORMAL_SYSTEM, build_custom_quiz_system
 from questioner.schemas import (
@@ -114,17 +115,17 @@ def generate_quiz(
     language: str = "en",
     custom_counts: CustomQuizCounts | None = None,
 ) -> QuizResult:
-    if not knowledge.has_substantive_content or not knowledge.knowledge_points:
+    if not knowledge.has_substantive_content or not literature_analysis_is_substantive(
+        knowledge.literature_analysis
+    ):
         raise ValueError(
-            "Knowledge points are empty or lack substantive content; cannot generate quiz."
+            "Literature analysis is empty or lacks substantive content; cannot generate quiz."
         )
 
     client = llm or LLMClient()
     payload = {
         "output_language": get_output_language_name(language),
-        "entities": knowledge.entities,
-        "knowledge_points": [kp.model_dump(mode="json") for kp in knowledge.knowledge_points],
-        "summary": knowledge.summary,
+        "literature_analysis": knowledge.literature_analysis.model_dump(mode="json"),
     }
 
     if mode == QuizMode.EASY:

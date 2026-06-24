@@ -2,6 +2,26 @@
 
 All notable changes to Questioner are documented in this file.
 
+## [1.3.3] — 2026-06-23
+
+### Literature analysis (IMRaD)
+
+- Replace knowledge-point list with four-section analysis: Introduction, Methods, Results, Discussion.
+- Quiz generation and PDF reports use the structured analysis instead of KP summaries.
+
+### Logic & grading
+
+- Add logic options **F** (both correct, no causality) and **G** (mutually exclusive).
+- Logic UI shows **Q6–Q8 · shared options** without redundant option descriptions.
+- Choice explanations: LLM-generated rationales for wrong/missed options only in UI; full option notes in PDF.
+- Short-answer strict scoring: −10 for logic errors and concept confusion; keyword-based partial credit otherwise.
+- Multi-select scoring summary clarifies one-miss-one-wrong (4/10) rule.
+
+### PDF report header
+
+- Add **Article Information** table: title, journal, impact factor (JCR lookup at submission), authors & affiliations, publication date, DOI link, field tags.
+- Bundled JCR 2024 journal IF database with Crossref/OpenAlex enrichment and cache.
+
 ## [1.3.2] — 2026-06-23
 
 ### Knowledge extraction

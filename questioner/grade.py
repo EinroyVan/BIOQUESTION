@@ -12,17 +12,25 @@ from questioner.i18n import (
     get_output_language_name,
     translate_content,
 )
+from questioner.literature_format import literature_analysis_is_substantive
 from questioner.llm import LLMClient
-from questioner.prompts import GRADE_EASY_SHORT_ANSWER_SYSTEM, GRADE_SHORT_ANSWER_SYSTEM
+from questioner.prompts import (
+    GRADE_CHOICE_EXPLANATIONS_SYSTEM,
+    GRADE_EASY_SHORT_ANSWER_SYSTEM,
+    GRADE_SHORT_ANSWER_SYSTEM,
+    LOGIC_OPTION_LABELS,
+)
 from questioner.schemas import (
     ChoiceGradingDetail,
     GradingReport,
+    KnowledgeExtractionResult,
     LogicQuestion,
     MultipleChoiceQuestion,
     QuestionGradingResult,
     QuestionType,
     QuizMode,
     QuizResult,
+    ShortAnswerGradingDetail,
     ShortAnswerQuestion,
     SingleChoiceQuestion,
     UserAnswer,
@@ -36,6 +44,7 @@ from questioner.scoring import (
     custom_quiz_max_score,
     explain_logic,
     explain_multiple_choice,
+    explain_single_choice,
     normal_quiz_max_score,
     question_max_score,
     score_logic_question,
@@ -48,6 +57,16 @@ from questioner.scoring import (
 class _ShortAnswerGradeResponse(BaseModel):
     question_results: list[QuestionGradingResult] = Field(default_factory=list)
     summary: str = ""
+
+
+class _ChoiceRationaleItem(BaseModel):
+    question_id: str
+    issue_rationales: dict[str, str] = Field(default_factory=dict)
+    pdf_rationales: dict[str, str] = Field(default_factory=dict)
+
+
+class _ChoiceRationaleResponse(BaseModel):
+    questions: list[_ChoiceRationaleItem] = Field(default_factory=list)
 
 
 def _answer_map(sheet: UserAnswerSheet) -> dict[str, UserAnswer]:
@@ -66,6 +85,26 @@ def _selected_list(user_answer: UserAnswer | None) -> list[str]:
     return user_answer.answer
 
 
+def _compute_short_answer_score(
+    question: ShortAnswerQuestion,
+    detail: ShortAnswerGradingDetail,
+    max_score: float,
+) -> float:
+    keywords = question.grading_keywords
+    if keywords:
+        matched = len(detail.matched_keywords)
+        keyword_base = (matched / len(keywords)) * max_score
+    else:
+        keyword_base = max_score if detail.logic_complete else 0.0
+
+    penalties = 0.0
+    if detail.logic_error:
+        penalties += 10.0
+    if detail.concept_confusion:
+        penalties += 10.0
+    return round(max(0.0, min(max_score, keyword_base - penalties)), 1)
+
+
 def _grade_scored_choice(
     question: SingleChoiceQuestion | MultipleChoiceQuestion | LogicQuestion,
     user_answer: UserAnswer | None,
@@ -77,17 +116,12 @@ def _grade_scored_choice(
         score, detail, is_correct = score_single_choice(question, selected)
         max_score = SINGLE_MAX_SCORE
         qtype = QuestionType.SINGLE_CHOICE
-        explanation = question.explanation if is_correct else (
-            f"Correct: {question.correct_answer}. "
-            f"Your answer: {', '.join(selected) or '(empty)'}."
-        )
+        explanation = explain_single_choice(question, detail, score)
     elif isinstance(question, LogicQuestion):
         score, detail, is_correct = score_logic_question(question, selected)
         max_score = LOGIC_MAX_SCORE
         qtype = QuestionType.LOGIC
         explanation = explain_logic(detail, score)
-        if question.explanation:
-            explanation = f"{question.explanation} {explanation}"
     else:
         score, detail, is_correct = score_multiple_choice(question, selected)
         max_score = MS_MAX_SCORE
@@ -101,7 +135,7 @@ def _grade_scored_choice(
         max_score=max_score,
         is_correct=is_correct,
         choice_detail=detail,
-        explanation=_maybe_translate(explanation, language),
+        explanation=explanation,
         references=question.references,
     )
 
@@ -114,23 +148,18 @@ def _grade_easy_choice(
     selected = _selected_list(user_answer)
     correct = question.correct_answer
     is_correct = set(selected) == {correct}
+    wrong = sorted(set(selected) - {correct})
+    missed = [] if is_correct else [correct]
     detail = ChoiceGradingDetail(
         user_answers=sorted(selected),
         correct_answers=[correct],
-        missed=[] if is_correct else [correct],
-        wrong=sorted(set(selected) - {correct}),
+        missed=missed,
+        wrong=wrong,
         is_correct=is_correct,
     )
-    if is_correct:
-        explanation = question.explanation or "Correct."
-    elif not selected:
-        explanation = "No option selected."
-    else:
-        explanation = (
-            f"Incorrect. You selected {selected[0]}; correct answer is {correct}."
-        )
-        if question.explanation:
-            explanation = f"{question.explanation} {explanation}"
+    explanation = explain_single_choice(
+        question, detail, SINGLE_MAX_SCORE if is_correct else 0.0
+    )
 
     return QuestionGradingResult(
         question_id=question.id,
@@ -139,7 +168,7 @@ def _grade_easy_choice(
         max_score=0.0,
         is_correct=is_correct,
         choice_detail=detail,
-        explanation=_maybe_translate(explanation, language),
+        explanation=explanation,
         references=question.references,
     )
 
@@ -199,7 +228,12 @@ def _grade_short_answers_llm(
             )
             continue
         item.max_score = sa_max
-        if not easy:
+        if not easy and item.short_answer_detail:
+            item.score = _compute_short_answer_score(
+                question, item.short_answer_detail, sa_max
+            )
+            item.is_correct = item.score >= sa_max
+        elif not easy:
             item.score = round(max(0.0, min(sa_max, item.score)), 1)
         else:
             item.score = 0.0
@@ -207,6 +241,94 @@ def _grade_short_answers_llm(
             item.references = question.references
         results.append(item)
     return results, response.summary
+
+
+def _choice_question_payload(
+    question: SingleChoiceQuestion | MultipleChoiceQuestion | LogicQuestion,
+    result: QuestionGradingResult,
+) -> dict | None:
+    detail = result.choice_detail
+    if detail is None or (not detail.missed and not detail.wrong):
+        return None
+
+    payload: dict = {
+        "question_id": question.id,
+        "type": question.type.value,
+        "correct_answers": detail.correct_answers,
+        "user_answers": detail.user_answers,
+        "missed_keys": detail.missed,
+        "wrong_keys": detail.wrong,
+        "references": [r.model_dump(mode="json") for r in question.references],
+        "author_explanation": question.explanation,
+    }
+    if isinstance(question, LogicQuestion):
+        payload["description_alpha"] = question.description_alpha
+        payload["description_beta"] = question.description_beta
+        payload["logic_options"] = LOGIC_OPTION_LABELS
+    else:
+        payload["stem"] = question.stem
+        payload["options"] = question.options
+    return payload
+
+
+def _enrich_choice_rationales(
+    quiz: QuizResult,
+    results: list[QuestionGradingResult],
+    llm: LLMClient,
+    language: str,
+    knowledge: KnowledgeExtractionResult | None = None,
+) -> None:
+    quiz_map = {q.id: q for q in quiz.questions}
+    payloads: list[dict] = []
+    for result in results:
+        question = quiz_map.get(result.question_id)
+        if question is None or not isinstance(
+            question, (SingleChoiceQuestion, MultipleChoiceQuestion, LogicQuestion)
+        ):
+            continue
+        item = _choice_question_payload(question, result)
+        if item:
+            payloads.append(item)
+
+    if not payloads:
+        return
+
+    context: dict = {
+        "output_language": get_output_language_name(language),
+        "questions": payloads,
+    }
+    if knowledge and literature_analysis_is_substantive(knowledge.literature_analysis):
+        context["literature_analysis"] = knowledge.literature_analysis.model_dump(mode="json")
+    elif knowledge and knowledge.knowledge_points:
+        context["knowledge_points"] = [
+            {
+                "id": kp.id,
+                "title": kp.title,
+                "content": kp.content,
+                "source_quote": kp.source_quote,
+            }
+            for kp in knowledge.knowledge_points
+        ]
+
+    response = llm.complete_json(
+        augment_system_prompt_for_language(GRADE_CHOICE_EXPLANATIONS_SYSTEM, language),
+        f"Write option rationales in {context['output_language']}:\n\n"
+        f"{json.dumps(context, ensure_ascii=False, indent=2)}",
+        _ChoiceRationaleResponse,
+    )
+    by_id = {item.question_id: item for item in response.questions}
+    for result in results:
+        item = by_id.get(result.question_id)
+        if item is None or result.choice_detail is None:
+            continue
+        result.choice_detail.option_issue_rationales = {
+            key: _maybe_translate(text, language)
+            for key, text in item.issue_rationales.items()
+        }
+        result.choice_detail.option_pdf_rationales = {
+            key: _maybe_translate(text, language)
+            for key, text in item.pdf_rationales.items()
+        }
 
 
 def _compute_max_score(quiz: QuizResult) -> float:
@@ -224,6 +346,7 @@ def _grade_easy(
     answers: UserAnswerSheet,
     llm: LLMClient | None,
     language: str,
+    knowledge: KnowledgeExtractionResult | None = None,
 ) -> GradingReport:
     by_id = _answer_map(answers)
     results: list[QuestionGradingResult] = []
@@ -256,6 +379,11 @@ def _grade_easy(
         f"Easy mode (no scoring): {mc_ok} single-choice correct. {sa_summary}".strip(),
         language,
     )
+    client = llm or LLMClient()
+    _enrich_choice_rationales(quiz, ordered, client, language, knowledge)
+    for result in ordered:
+        if result.explanation:
+            result.explanation = _maybe_translate(result.explanation, language)
     return GradingReport(
         total_score=0.0,
         max_score=0.0,
@@ -272,9 +400,10 @@ def grade_answers(
     answers: UserAnswerSheet,
     llm: LLMClient | None = None,
     language: str = "en",
+    knowledge: KnowledgeExtractionResult | None = None,
 ) -> GradingReport:
     if quiz.mode == QuizMode.EASY:
-        return _grade_easy(quiz, answers, llm, language)
+        return _grade_easy(quiz, answers, llm, language, knowledge)
 
     by_id = _answer_map(answers)
     choice_results: list[QuestionGradingResult] = []
@@ -295,6 +424,13 @@ def grade_answers(
         )
     else:
         sa_results, sa_summary = [], ""
+
+    client = llm or LLMClient()
+    _enrich_choice_rationales(quiz, choice_results, client, language, knowledge)
+
+    for result in choice_results:
+        if result.explanation:
+            result.explanation = _maybe_translate(result.explanation, language)
 
     ordered: list[QuestionGradingResult] = []
     sa_iter = iter(sa_results)

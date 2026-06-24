@@ -12,7 +12,7 @@ from questioner import PROJECT_ROOT
 from questioner.ui_strings import UI_STRINGS
 
 CACHE_DIR = PROJECT_ROOT / ".cache" / "i18n"
-I18N_CACHE_VERSION = 5
+I18N_CACHE_VERSION = 9
 
 LANGUAGES: dict[str, str] = {
     "en": "English",
@@ -175,12 +175,11 @@ def get_output_language_name(lang_code: str) -> str:
 def llm_output_language_clause(lang_code: str) -> str:
     name = get_output_language_name(lang_code)
     return (
-        f"Output language: write all titles, summaries, entity names, knowledge point content, "
+        f"Output language: write all section titles, field labels, analysis text, "
         f"question stems, options, standard answers, grading_keywords, logic_chain, explanations, "
         f"feedback, and summaries in {name}. "
-        "Keep source_quote verbatim from the paper (original language). "
-        "Keep JSON keys, question IDs, option letters (A–E), and knowledge-point category "
-        "values (entity, mechanism, finding) unchanged."
+        "Keep JSON keys, question IDs, option letters (A–G), literature section ids "
+        "(introduction, methods, results, discussion), and knowledge_point_id section refs unchanged."
     )
 
 

@@ -9,10 +9,22 @@ from typing import Any
 
 import fitz
 
+from questioner.literature_format import (
+    literature_analysis_is_substantive,
+    render_literature_analysis_html,
+    render_literature_analysis_markdown,
+)
+from questioner.metadata_format import (
+    MetadataLabels,
+    enrich_literature_metadata,
+    metadata_is_present,
+    render_metadata_html,
+    render_metadata_markdown,
+)
 from questioner.schemas import (
     GradingReport,
     KnowledgeExtractionResult,
-    KnowledgePoint,
+    LiteratureMetadata,
     LogicQuestion,
     MultipleChoiceQuestion,
     Question,
@@ -53,6 +65,33 @@ h3 {
   color: #666;
   font-size: 10pt;
   margin-bottom: 16pt;
+}
+.article-metadata {
+  margin: 18pt 0 22pt 0;
+  page-break-inside: avoid;
+}
+.metadata-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8pt;
+  font-size: 10pt;
+}
+.metadata-table th,
+.metadata-table td {
+  border: 1px solid #c8d6e0;
+  padding: 8pt 10pt;
+  text-align: left;
+  vertical-align: top;
+}
+.metadata-table th {
+  width: 30%;
+  background: #f4f8fb;
+  color: #2c3e50;
+  font-weight: 600;
+}
+.metadata-table td a {
+  color: #0f4c81;
+  text-decoration: none;
 }
 .score-box {
   background: #eef6fc;
@@ -176,11 +215,11 @@ def _format_question_error(
     return f"{item.question_id} ({item.score:.1f}/{item.max_score:.1f} pts) — needs review"
 
 
-def _map_weak_knowledge_points(
+def _map_weak_sections(
     report: GradingReport,
     quiz: QuizResult,
 ) -> dict[str, list[str]]:
-    """Map knowledge-point IDs to quiz error notes for questions the user got wrong."""
+    """Map literature section ids to quiz error notes for wrong answers."""
     quiz_map = {q.id: q for q in quiz.questions}
     weak: dict[str, list[str]] = {}
 
@@ -189,7 +228,7 @@ def _map_weak_knowledge_points(
             continue
         q = quiz_map.get(item.question_id)
         error_note = _format_question_error(item, q)
-        seen_kp: set[str] = set()
+        seen: set[str] = set()
 
         ref_sources = []
         if q is not None:
@@ -197,15 +236,22 @@ def _map_weak_knowledge_points(
         ref_sources.extend(item.references)
 
         for ref in ref_sources:
-            kp_id = ref.knowledge_point_id
-            if not kp_id or kp_id in seen_kp:
+            section_id = ref.knowledge_point_id.strip().lower()
+            if not section_id or section_id in seen:
                 continue
-            seen_kp.add(kp_id)
-            notes = weak.setdefault(kp_id, [])
+            seen.add(section_id)
+            notes = weak.setdefault(section_id, [])
             if error_note not in notes:
                 notes.append(error_note)
 
     return weak
+
+
+def _map_weak_knowledge_points(
+    report: GradingReport,
+    quiz: QuizResult,
+) -> dict[str, list[str]]:
+    return _map_weak_sections(report, quiz)
 
 
 def _collect_weak_points(
@@ -248,97 +294,62 @@ def _mc_option_lines(
     return lines
 
 
-def _render_knowledge_point_markdown(
-    kp: KnowledgePoint,
-    weak_notes: list[str] | None,
-) -> list[str]:
-    cat = kp.category.value.title()
-    lines: list[str] = []
-    if weak_notes:
-        lines.append(f"### ❌ [{kp.id}] {cat} · {kp.title} *(quiz error — review)*")
-    else:
-        lines.append(f"### [{kp.id}] {cat} · {kp.title}")
-    lines.append("")
-    lines.append(kp.content)
-    lines.append("")
-    lines.append(f"> {kp.source_quote}")
-    if weak_notes:
-        lines.append("")
-        lines.append("**Quiz errors linked to this point:**")
-        for note in weak_notes:
-            lines.append(f"- ❌ {note}")
-    lines.append("")
-    return lines
-
-
-def _render_knowledge_point_html(
-    kp: KnowledgePoint,
-    weak_notes: list[str] | None,
-) -> str:
-    cat = kp.category.value.title()
-    block_class = "kp-block kp-weak" if weak_notes else "kp-block"
-    parts = [
-        f'<div class="{block_class}">',
-        f'<h3 class="kp-title">[{_esc(kp.id)}] {_esc(cat)} · {_esc(kp.title)}</h3>',
-        f'<p class="kp-body">{_esc(kp.content)}</p>',
-        f"<blockquote>{_esc(kp.source_quote)}</blockquote>",
-    ]
-    if weak_notes:
-        notes = "".join(f"<li>{_esc(n)}</li>" for n in weak_notes)
-        parts.append(
-            f'<div class="quiz-error-note"><strong>Quiz errors linked to this knowledge point:</strong>'
-            f"<ul>{notes}</ul></div>"
-        )
-    parts.append("</div>")
-    return "\n".join(parts)
-
-
-def _render_knowledge_section_markdown(
+def _render_literature_section_markdown(
     knowledge: KnowledgeExtractionResult,
-    weak_kp_map: dict[str, list[str]],
+    weak_section_map: dict[str, list[str]],
 ) -> list[str]:
     lines: list[str] = [
-        "## Complete Literature Knowledge Notes",
+        "## Literature Analysis",
         "",
-        "All extracted knowledge points from the literature. "
-        "Points linked to quiz errors are marked with ❌.",
-        "",
-        "### Summary",
-        "",
-        knowledge.summary,
+        "Structured analysis extracted from the literature (Introduction, Methods, Results, Discussion). "
+        "Sections linked to quiz errors are marked with ❌.",
         "",
     ]
-    if knowledge.entities:
-        lines.append(f"**Core entities:** {', '.join(knowledge.entities)}")
-        lines.append("")
-
-    for kp in knowledge.knowledge_points:
-        lines.extend(_render_knowledge_point_markdown(kp, weak_kp_map.get(kp.id)))
+    lines.extend(
+        render_literature_analysis_markdown(
+            knowledge.literature_analysis,
+            weak_sections=weak_section_map,
+        )
+    )
     return lines
 
 
-def _render_knowledge_section_html(
+def _render_literature_section_html(
     knowledge: KnowledgeExtractionResult,
-    weak_kp_map: dict[str, list[str]],
+    weak_section_map: dict[str, list[str]],
 ) -> list[str]:
-    weak_count = sum(1 for kp in knowledge.knowledge_points if kp.id in weak_kp_map)
-    total = len(knowledge.knowledge_points)
+    weak_count = len(weak_section_map)
     parts: list[str] = [
-        "<h2>Complete Literature Knowledge Notes</h2>",
-        '<p class="section-note">This section includes every knowledge point extracted from the '
-        "literature. Items you answered incorrectly in the quiz are highlighted in "
+        "<h2>Literature Analysis</h2>",
+        '<p class="section-note">Structured notes from the literature. '
+        "Sections you answered incorrectly in the quiz are highlighted in "
         "<span class='error'>red</span> with linked error details.</p>",
-        f"<p><strong>Coverage:</strong> {total} knowledge point(s); "
-        f"<span class='error'>{weak_count} need review</span> based on your quiz answers.</p>",
-        "<h3>Summary</h3>",
-        f"<p>{_esc(knowledge.summary)}</p>",
     ]
-    if knowledge.entities:
-        parts.append(f"<p><strong>Core entities:</strong> {_esc(', '.join(knowledge.entities))}</p>")
-
-    for kp in knowledge.knowledge_points:
-        parts.append(_render_knowledge_point_html(kp, weak_kp_map.get(kp.id)))
+    if weak_count:
+        parts.append(
+            f"<p><span class='error'>{weak_count} section(s) need review</span> "
+            "based on your quiz answers.</p>"
+        )
+    parts.extend(
+        render_literature_analysis_html(
+            knowledge.literature_analysis,
+            weak_sections=weak_section_map,
+            esc=_esc,
+        )
+    )
     return parts
+
+
+def _resolve_report_metadata(
+    knowledge: KnowledgeExtractionResult | None,
+    generated_at: datetime | None,
+) -> LiteratureMetadata | None:
+    if knowledge is None or not metadata_is_present(knowledge.literature_metadata):
+        return None
+    return enrich_literature_metadata(
+        knowledge.literature_metadata,
+        as_of=generated_at or datetime.now(),
+    )
 
 
 def build_report_markdown(
@@ -349,11 +360,13 @@ def build_report_markdown(
     *,
     source_label: str = "Literature excerpt",
     generated_at: datetime | None = None,
+    metadata_labels: MetadataLabels | None = None,
 ) -> str:
     ts = (generated_at or datetime.now()).strftime("%Y-%m-%d %H:%M")
     quiz_map = {q.id: q for q in quiz.questions}
-    weak_kp_map = _map_weak_knowledge_points(report, quiz)
+    weak_section_map = _map_weak_sections(report, quiz)
     weak = _collect_weak_points(report, quiz, answers)
+    metadata = _resolve_report_metadata(knowledge, generated_at)
 
     lines: list[str] = [
         "# Questioner Learning Report",
@@ -362,14 +375,24 @@ def build_report_markdown(
         f"- **Generated:** {ts}",
         f"- **Score:** {report.total_score:.1f} / {report.max_score:.0f} ({report.percentage:.1f}%)",
         "",
-        "## Overall Assessment",
-        "",
-        report.summary,
-        "",
     ]
 
-    if knowledge and knowledge.has_substantive_content and knowledge.knowledge_points:
-        lines.extend(_render_knowledge_section_markdown(knowledge, weak_kp_map))
+    if metadata:
+        lines.extend(render_metadata_markdown(metadata, labels=metadata_labels))
+
+    lines.extend(
+        [
+            "## Overall Assessment",
+            "",
+            report.summary,
+            "",
+        ]
+    )
+
+    if knowledge and knowledge.has_substantive_content and literature_analysis_is_substantive(
+        knowledge.literature_analysis
+    ):
+        lines.extend(_render_literature_section_markdown(knowledge, weak_section_map))
     elif knowledge and knowledge.has_substantive_content:
         lines.extend(["## Literature Summary", "", knowledge.summary, ""])
     else:
@@ -377,7 +400,7 @@ def build_report_markdown(
             [
                 "## Literature Knowledge Notes",
                 "",
-                "_No knowledge extraction data available for this session._",
+                "_No literature analysis available for this session._",
                 "",
             ]
         )
@@ -418,11 +441,24 @@ def build_report_markdown(
             d = item.choice_detail
             lines.append(f"**Your answer:** {_format_user_mc(d.user_answers)}")
             lines.append(f"**Correct answer:** {', '.join(sorted(d.correct_answers))}")
-            if not item.is_correct:
+            if d.option_pdf_rationales:
+                lines.append("")
+                lines.append("**Option notes:**")
+                for key in sorted(d.option_pdf_rationales):
+                    lines.append(f"- **{key}.** {d.option_pdf_rationales[key]}")
+            elif d.option_issue_rationales:
+                lines.append("")
+                lines.append("**Option review:**")
+                for key in sorted(d.option_issue_rationales):
+                    lines.append(f"- **{key}.** {d.option_issue_rationales[key]}")
+            elif not item.is_correct:
                 if d.wrong:
                     lines.append(f"**❌ Wrong selections:** {', '.join(d.wrong)}")
                 if d.missed:
-                    lines.append(f"**❌ Missed (unclear):** {', '.join(d.missed)}")
+                    lines.append(f"**❌ Missed:** {', '.join(d.missed)}")
+            elif getattr(q, "explanation", ""):
+                lines.append("")
+                lines.append(f"**Reference notes:** {q.explanation}")
             lines.append("")
 
         elif isinstance(q, ShortAnswerQuestion):
@@ -453,11 +489,13 @@ def build_report_html(
     *,
     source_label: str = "Literature excerpt",
     generated_at: datetime | None = None,
+    metadata_labels: MetadataLabels | None = None,
 ) -> str:
     ts = (generated_at or datetime.now()).strftime("%Y-%m-%d %H:%M")
     quiz_map = {q.id: q for q in quiz.questions}
-    weak_kp_map = _map_weak_knowledge_points(report, quiz)
+    weak_section_map = _map_weak_sections(report, quiz)
     weak = _collect_weak_points(report, quiz, answers)
+    metadata = _resolve_report_metadata(knowledge, generated_at)
 
     parts: list[str] = [
         "<h1>Questioner Learning Report</h1>",
@@ -466,16 +504,26 @@ def build_report_html(
         f'<div class="score-box"><strong>Total score:</strong> '
         f"{report.total_score:.1f} / {report.max_score:.0f} "
         f"({report.percentage:.1f}%)</div>",
-        "<h2>Overall Assessment</h2>",
-        f"<p>{_esc(report.summary)}</p>",
     ]
 
-    if knowledge and knowledge.has_substantive_content and knowledge.knowledge_points:
-        parts.extend(_render_knowledge_section_html(knowledge, weak_kp_map))
+    if metadata:
+        parts.append(render_metadata_html(metadata, labels=metadata_labels, esc=_esc))
+
+    parts.extend(
+        [
+            "<h2>Overall Assessment</h2>",
+            f"<p>{_esc(report.summary)}</p>",
+        ]
+    )
+
+    if knowledge and knowledge.has_substantive_content and literature_analysis_is_substantive(
+        knowledge.literature_analysis
+    ):
+        parts.extend(_render_literature_section_html(knowledge, weak_section_map))
     elif knowledge and knowledge.has_substantive_content:
         parts.extend(["<h2>Literature Summary</h2>", f"<p>{_esc(knowledge.summary)}</p>"])
     else:
-        parts.append("<p><em>No knowledge extraction data available for this session.</em></p>")
+        parts.append("<p><em>No literature analysis available for this session.</em></p>")
 
     if weak:
         items = "".join(f"<li>{_esc(w)}</li>" for w in weak)
@@ -485,8 +533,8 @@ def build_report_html(
 
     parts.append('<div class="appendix"><h2>Appendix · Question-by-Question Review</h2>')
     parts.append(
-        '<p class="section-note">Detailed quiz breakdown. See the knowledge notes above for the '
-        "full literature content with error-linked items in red.</p>"
+        '<p class="section-note">Detailed quiz breakdown. See the literature analysis above for '
+        "full section notes with error-linked items in red.</p>"
     )
 
     for item in report.question_results:
@@ -524,6 +572,24 @@ def build_report_html(
                     f"<p><strong>Correct answer:</strong> "
                     f"{_esc(', '.join(sorted(d.correct_answers)))}</p>"
                 )
+            if d.option_pdf_rationales:
+                parts.append("<p><strong>Option notes:</strong></p><ul>")
+                for key in sorted(d.option_pdf_rationales):
+                    cls = "tag-wrong" if key in set(d.wrong) | set(d.missed) else ""
+                    parts.append(
+                        f'<li><span class="{cls}"><strong>{_esc(key)}.</strong> '
+                        f"{_esc(d.option_pdf_rationales[key])}</span></li>"
+                    )
+                parts.append("</ul>")
+            elif d.option_issue_rationales:
+                parts.append("<p><strong>Option review:</strong></p><ul>")
+                for key in sorted(d.option_issue_rationales):
+                    parts.append(
+                        f'<li><span class="tag-wrong"><strong>{_esc(key)}.</strong> '
+                        f"{_esc(d.option_issue_rationales[key])}</span></li>"
+                    )
+                parts.append("</ul>")
+            elif not item.is_correct:
                 parts.append("<ul>")
                 if isinstance(q, MultipleChoiceQuestion):
                     for key, text, status in _mc_option_lines(q, item):
@@ -546,6 +612,12 @@ def build_report_html(
                     f'<p><strong>Missing concepts:</strong> '
                     f'<span class="error">{_esc(", ".join(item.short_answer_detail.missing_keywords))}</span></p>'
                 )
+            if item.short_answer_detail:
+                sa = item.short_answer_detail
+                if sa.logic_error:
+                    parts.append('<p><span class="error">Logic/reasoning error: −10 pts</span></p>')
+                if sa.concept_confusion:
+                    parts.append('<p><span class="error">Concept confusion: −10 pts</span></p>')
             parts.append(f"<p><strong>Model answer:</strong> {_esc(q.standard_answer)}</p>")
 
         parts.append(f"<p><strong>Explanation:</strong> {_esc(item.explanation)}</p>")
@@ -582,12 +654,14 @@ def build_study_report_bundle(
     *,
     source_label: str = "Literature excerpt",
     generated_at: datetime | None = None,
+    metadata_labels: MetadataLabels | None = None,
 ) -> dict[str, Any]:
     ts = generated_at or datetime.now()
     stem = f"questioner_report_{ts:%Y%m%d_%H%M%S}"
     kwargs = {
         "source_label": source_label,
         "generated_at": ts,
+        "metadata_labels": metadata_labels,
     }
     markdown = build_report_markdown(report, quiz, knowledge, answers, **kwargs)
     html_body = build_report_html(report, quiz, knowledge, answers, **kwargs)

@@ -15,11 +15,19 @@ _ocr_engine = None
 
 
 @dataclass
+class PdfDocumentInfo:
+    title: str = ""
+    author: str = ""
+    subject: str = ""
+
+
+@dataclass
 class PdfExtractionResult:
     text: str
     page_count: int
     native_text_pages: int
     ocr_pages: int
+    document_info: PdfDocumentInfo | None = None
 
     @property
     def summary(self) -> str:
@@ -62,6 +70,11 @@ def extract_text_from_pdf(
 ) -> PdfExtractionResult:
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     page_count = doc.page_count
+    doc_info = PdfDocumentInfo(
+        title=(doc.metadata or {}).get("title", "") or "",
+        author=(doc.metadata or {}).get("author", "") or "",
+        subject=(doc.metadata or {}).get("subject", "") or "",
+    )
     chunks: list[str] = []
     native_pages = 0
     ocr_pages = 0
@@ -91,6 +104,7 @@ def extract_text_from_pdf(
         page_count=page_count,
         native_text_pages=native_pages,
         ocr_pages=ocr_pages,
+        document_info=doc_info,
     )
 
 

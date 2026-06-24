@@ -6,6 +6,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
+from questioner.literature_format import render_literature_analysis_markdown
 from questioner.schemas import (
     GradingReport,
     KnowledgeExtractionResult,
@@ -19,24 +20,11 @@ console = Console()
 
 def print_knowledge(result: KnowledgeExtractionResult) -> None:
     if not result.has_substantive_content:
-        console.print("[yellow]No key knowledge points found[/yellow]")
+        console.print("[yellow]No substantive literature content found[/yellow]")
         return
 
-    console.print(Panel(result.summary, title="Summary", border_style="blue"))
-    if result.entities:
-        console.print(f"[bold]Core entities:[/bold] {', '.join(result.entities)}")
-
-    for kp in result.knowledge_points:
-        category_label = {"entity": "Entity", "mechanism": "Mechanism", "finding": "Finding"}[
-            kp.category.value
-        ]
-        console.print(
-            Panel(
-                f"{kp.content}\n\n[dim]Quote: {kp.source_quote}[/dim]",
-                title=f"[{kp.id}] {category_label} · {kp.title}",
-                border_style="green",
-            )
-        )
+    text = "\n".join(render_literature_analysis_markdown(result.literature_analysis))
+    console.print(Panel(text, title="Literature Analysis", border_style="blue"))
 
 
 def print_quiz(quiz: QuizResult) -> None:

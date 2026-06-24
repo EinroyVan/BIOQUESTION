@@ -45,6 +45,50 @@ def normalize_knowledge_category(value: object) -> object:
     return _CATEGORY_ALIASES.get(lowered, stripped)
 
 
+class IntroductionSection(BaseModel):
+    hook: str = ""
+    research_gap: str = ""
+    proposed_approach: str = ""
+
+
+class MethodsSection(BaseModel):
+    technical_innovation: str = ""
+    benchmarks_evaluation: str = ""
+
+
+class ResultsSection(BaseModel):
+    key_findings: list[str] = Field(default_factory=list)
+    evidence_quality: str = ""
+
+
+class DiscussionSection(BaseModel):
+    limitations: str = ""
+    future_directions: str = ""
+
+
+class LiteratureAnalysis(BaseModel):
+    introduction: IntroductionSection = Field(default_factory=IntroductionSection)
+    methods: MethodsSection = Field(default_factory=MethodsSection)
+    results: ResultsSection = Field(default_factory=ResultsSection)
+    discussion: DiscussionSection = Field(default_factory=DiscussionSection)
+
+
+class LiteratureMetadata(BaseModel):
+    title: str = ""
+    journal: str = ""
+    impact_factor: str = ""
+    impact_factor_year: str = ""
+    impact_factor_source: str = ""
+    first_author: str = ""
+    first_author_affiliation: str = ""
+    corresponding_author: str = ""
+    corresponding_author_affiliation: str = ""
+    published_date: str = ""
+    doi: str = ""
+    doi_url: str = ""
+    field_tags: list[str] = Field(default_factory=list)
+
+
 class KnowledgePoint(BaseModel):
     id: str
     category: KnowledgeCategory
@@ -77,6 +121,8 @@ class KnowledgeExtractionResult(BaseModel):
         description="First 200 characters of the input text for traceability."
     )
     has_substantive_content: bool = True
+    literature_analysis: LiteratureAnalysis = Field(default_factory=LiteratureAnalysis)
+    literature_metadata: LiteratureMetadata = Field(default_factory=LiteratureMetadata)
     entities: list[str] = Field(default_factory=list)
     knowledge_points: list[KnowledgePoint] = Field(default_factory=list)
     summary: str = ""
@@ -102,11 +148,13 @@ class QuizMode(str, Enum):
 
 
 class Reference(BaseModel):
-    knowledge_point_id: str
-    source_quote: str
+    knowledge_point_id: str = Field(
+        description="Literature section id: introduction, methods, results, or discussion."
+    )
+    source_quote: str = ""
 
 
-LOGIC_OPTION_KEYS = ("A", "B", "C", "D", "E")
+LOGIC_OPTION_KEYS = ("A", "B", "C", "D", "E", "F", "G")
 
 
 class SingleChoiceQuestion(BaseModel):
@@ -183,12 +231,16 @@ class ChoiceGradingDetail(BaseModel):
     extra: list[str] = Field(default_factory=list)
     wrong: list[str] = Field(default_factory=list)
     is_correct: bool = False
+    option_issue_rationales: dict[str, str] = Field(default_factory=dict)
+    option_pdf_rationales: dict[str, str] = Field(default_factory=dict)
 
 
 class ShortAnswerGradingDetail(BaseModel):
     matched_keywords: list[str] = Field(default_factory=list)
     missing_keywords: list[str] = Field(default_factory=list)
     logic_complete: bool = False
+    logic_error: bool = False
+    concept_confusion: bool = False
     feedback: str = ""
 
 
