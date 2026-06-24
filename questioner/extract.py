@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from typing import Any
+
+from pydantic import BaseModel, Field, model_validator
 
 from questioner.i18n import augment_system_prompt_for_language
 from questioner.llm import LLMClient
@@ -20,6 +22,24 @@ class _ExtractLLMResponse(BaseModel):
     entities: list[str] = Field(default_factory=list)
     knowledge_points: list[KnowledgePoint] = Field(default_factory=list)
     summary: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_payload(cls, data: Any) -> Any:
+        if not isinstance(data, dict):
+            return data
+        fixed_kps: list[object] = []
+        for index, item in enumerate(data.get("knowledge_points") or [], start=1):
+            if not isinstance(item, dict):
+                fixed_kps.append(item)
+                continue
+            kp = dict(item)
+            if not str(kp.get("id", "")).strip():
+                kp["id"] = f"KP-{index}"
+            fixed_kps.append(kp)
+        data = dict(data)
+        data["knowledge_points"] = fixed_kps
+        return data
 
 
 def _trim_input(text: str) -> str:

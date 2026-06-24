@@ -45,6 +45,7 @@ Rules:
 - Every knowledge_point must include a traceable source_quote.
 - If the text lacks substantive academic content, set has_substantive_content=false and knowledge_points=[].
 - source_quote must be copied from the user text; do not invent quotes; max 200 characters each.
+- category must be exactly one of: entity, mechanism, finding (English literals only).
 - Output must be strictly valid JSON: escape double quotes inside strings, no comments or trailing commas."""
 
 

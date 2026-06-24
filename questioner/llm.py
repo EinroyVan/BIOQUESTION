@@ -85,24 +85,40 @@ class LLMClient:
                 "Copy .env.example to .env and set the key, or choose another provider in the sidebar."
             )
 
-    def _generate_google(self, system_prompt: str, user_prompt: str) -> str:
+    def _generate_google(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        json_schema: dict | None = None,
+    ) -> str:
         from google import genai
         from google.genai import types
 
         if self._google_client is None:
             self._google_client = genai.Client(api_key=self.api_key)
+        config_kwargs: dict = {
+            "system_instruction": system_prompt,
+            "response_mime_type": "application/json",
+            "temperature": 0.2,
+            "max_output_tokens": 8192,
+        }
+        if json_schema is not None:
+            config_kwargs["response_json_schema"] = json_schema
         response = self._google_client.models.generate_content(
             model=self.model,
             contents=user_prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                response_mime_type="application/json",
-                temperature=0.2,
-            ),
+            config=types.GenerateContentConfig(**config_kwargs),
         )
         return response.text or "{}"
 
-    def _generate_openai(self, system_prompt: str, user_prompt: str) -> str:
+    def _generate_openai(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        json_schema: dict | None = None,
+    ) -> str:
         from openai import OpenAI
 
         if self._openai_client is None:
@@ -110,14 +126,26 @@ class LLMClient:
             if self.base_url:
                 kwargs["base_url"] = self.base_url
             self._openai_client = OpenAI(**kwargs)
+        if json_schema is not None and self.provider == LLMProvider.OPENAI:
+            response_format = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": json_schema.get("title", "response"),
+                    "schema": json_schema,
+                    "strict": True,
+                },
+            }
+        else:
+            response_format = {"type": "json_object"}
         response = self._openai_client.chat.completions.create(
             model=self.model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            response_format={"type": "json_object"},
+            response_format=response_format,
             temperature=0.2,
+            max_tokens=8192,
         )
         return response.choices[0].message.content or "{}"
 
@@ -136,12 +164,22 @@ class LLMClient:
         parts = [block.text for block in response.content if block.type == "text"]
         return "".join(parts) or "{}"
 
-    def _generate(self, system_prompt: str, user_prompt: str) -> str:
+    def _generate(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        *,
+        json_schema: dict | None = None,
+    ) -> str:
         self._require_api_key()
         if self.provider == LLMProvider.GOOGLE:
-            return self._generate_google(system_prompt, user_prompt)
+            return self._generate_google(
+                system_prompt, user_prompt, json_schema=json_schema
+            )
         if self.provider in (LLMProvider.OPENAI, LLMProvider.OPENAI_COMPAT):
-            return self._generate_openai(system_prompt, user_prompt)
+            return self._generate_openai(
+                system_prompt, user_prompt, json_schema=json_schema
+            )
         if self.provider == LLMProvider.ANTHROPIC:
             return self._generate_anthropic(system_prompt, user_prompt)
         raise RuntimeError(f"Unsupported provider: {self.provider}")
@@ -156,10 +194,13 @@ class LLMClient:
     ) -> T:
         last_error: Exception | None = None
         prompt = user_prompt
+        json_schema = schema.model_json_schema()
 
         for attempt in range(max_retries + 1):
             try:
-                content = self._generate(system_prompt, prompt)
+                content = self._generate(
+                    system_prompt, prompt, json_schema=json_schema
+                )
                 data = _parse_json_text(content)
                 return schema.model_validate(data)
             except (json.JSONDecodeError, ValidationError, ValueError) as exc:
@@ -168,6 +209,8 @@ class LLMClient:
                     prompt = user_prompt + _JSON_RETRY_HINT
                 continue
 
+        detail = f": {last_error}" if last_error else ""
         raise RuntimeError(
-            f"Model JSON could not be parsed or validated (retried {max_retries} times)"
+            "Model JSON could not be parsed or validated "
+            f"(retried {max_retries} times){detail}"
         ) from last_error

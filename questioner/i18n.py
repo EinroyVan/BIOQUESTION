@@ -179,7 +179,8 @@ def llm_output_language_clause(lang_code: str) -> str:
         f"question stems, options, standard answers, grading_keywords, logic_chain, explanations, "
         f"feedback, and summaries in {name}. "
         "Keep source_quote verbatim from the paper (original language). "
-        "Keep JSON keys, question IDs, and option letters (A–E) unchanged."
+        "Keep JSON keys, question IDs, option letters (A–E), and knowledge-point category "
+        "values (entity, mechanism, finding) unchanged."
     )
 
 

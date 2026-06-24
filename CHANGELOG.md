@@ -2,6 +2,16 @@
 
 All notable changes to Questioner are documented in this file.
 
+## [1.3.2] — 2026-06-23
+
+### Knowledge extraction
+
+- Fix JSON parse/validation failures when creating knowledge points.
+- Google Gemini and OpenAI now use structured JSON schema output for more reliable responses.
+- Normalize `category` values (including Chinese aliases) and auto-fill missing knowledge-point IDs.
+- Truncate overlong `source_quote` fields; improve error messages with validation details.
+- Prompts clarify that `category` must remain English literals (`entity`, `mechanism`, `finding`).
+
 ## [1.3.1] — 2026-06-22
 
 ### Repository & paths

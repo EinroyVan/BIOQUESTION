@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class KnowledgeCategory(str, Enum):
@@ -14,12 +14,62 @@ class KnowledgeCategory(str, Enum):
     FINDING = "finding"
 
 
+_CATEGORY_ALIASES: dict[str, str] = {
+    "entity": "entity",
+    "entities": "entity",
+    "concept": "entity",
+    "实体": "entity",
+    "概念": "entity",
+    "mechanism": "mechanism",
+    "mechanisms": "mechanism",
+    "process": "mechanism",
+    "机制": "mechanism",
+    "机理": "mechanism",
+    "finding": "finding",
+    "findings": "finding",
+    "conclusion": "finding",
+    "result": "finding",
+    "发现": "finding",
+    "结论": "finding",
+    "结果": "finding",
+}
+
+
+def normalize_knowledge_category(value: object) -> object:
+    if not isinstance(value, str):
+        return value
+    stripped = value.strip()
+    if stripped in _CATEGORY_ALIASES:
+        return _CATEGORY_ALIASES[stripped]
+    lowered = stripped.lower()
+    return _CATEGORY_ALIASES.get(lowered, stripped)
+
+
 class KnowledgePoint(BaseModel):
     id: str
     category: KnowledgeCategory
     title: str
     content: str
     source_quote: str
+
+    @field_validator("category", mode="before")
+    @classmethod
+    def _normalize_category(cls, value: object) -> object:
+        return normalize_knowledge_category(value)
+
+    @field_validator("source_quote", mode="before")
+    @classmethod
+    def _truncate_source_quote(cls, value: object) -> object:
+        if isinstance(value, str) and len(value) > 200:
+            return value[:200]
+        return value
+
+    @field_validator("title", "content", mode="before")
+    @classmethod
+    def _coerce_text_fields(cls, value: object) -> object:
+        if value is None:
+            return ""
+        return value
 
 
 class KnowledgeExtractionResult(BaseModel):
